@@ -3,6 +3,7 @@ pyproject.toml
 src/tag/__init__.py
 src/tag/cli.py
 src/tag/config.py
+src/tag/importer.py
 src/tag/logger.py
 src/tag/main.py
 src/tag/model.py
