@@ -5,6 +5,7 @@ src/tag/cli.py
 src/tag/config.py
 src/tag/logger.py
 src/tag/main.py
+src/tag/model.py
 src/tag.egg-info/PKG-INFO
 src/tag.egg-info/SOURCES.txt
 src/tag.egg-info/dependency_links.txt

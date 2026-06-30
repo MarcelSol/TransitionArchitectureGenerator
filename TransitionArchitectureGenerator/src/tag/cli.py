@@ -1,6 +1,6 @@
 import typer
 from rich import print
-
+from tag.model import TransitionModel
 from tag import __version__
 
 app = typer.Typer(
@@ -10,14 +10,18 @@ app = typer.Typer(
 
 @app.command()
 def analyse(file: str):
-    """
-    Analyse a draw.io file.
-    """
+
+    model = TransitionModel()
 
     print(f"[green]TAG[/green] version {__version__}")
-    print(f"Analysing {file}")
-    print("")
-    print("Parser not implemented yet.")
+    print()
+
+    print(f"Input file : {file}")
+    print()
+
+    print(f"Pages       : {model.page_count()}")
+    print(f"Nodes       : {model.node_count()}")
+    print(f"Connections : {model.connection_count()}")
 
 
 @app.command()
