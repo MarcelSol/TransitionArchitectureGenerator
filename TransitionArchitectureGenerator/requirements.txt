@@ -1,0 +1,8 @@
+lxml
+openpyxl
+networkx
+typer
+rich
+pyyaml
+pytest
+ruff

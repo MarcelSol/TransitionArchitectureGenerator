@@ -1,0 +1,13 @@
+application_name: TAG
+
+company: MarcelyK
+
+version: 0.1.0
+
+box_width: 170
+
+box_height: 60
+
+horizontal_spacing: 80
+
+vertical_spacing: 80

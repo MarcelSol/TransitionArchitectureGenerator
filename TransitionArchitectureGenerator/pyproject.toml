@@ -1,0 +1,21 @@
+[project]
+name = "tag"
+version = "0.1.0"
+description = "Transition Architecture Generator"
+readme = "README.md"
+requires-python = ">=3.14"
+
+dependencies = [
+    "lxml",
+    "openpyxl",
+    "networkx",
+    "typer",
+    "rich",
+    "pyyaml"
+]
+
+[project.scripts]
+tag = "tag.cli:app"
+
+[tool.ruff]
+line-length = 100

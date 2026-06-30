@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+src/tag/__init__.py
+src/tag/cli.py
+src/tag/config.py
+src/tag/logger.py
+src/tag/main.py
+src/tag.egg-info/PKG-INFO
+src/tag.egg-info/SOURCES.txt
+src/tag.egg-info/dependency_links.txt
+src/tag.egg-info/entry_points.txt
+src/tag.egg-info/requires.txt
+src/tag.egg-info/top_level.txt
