@@ -4,9 +4,9 @@ from lxml import etree
 from tag.logger import logger
 
 
-class DrawioImporter:
+class DrawioReader:
     """
-    Imports a draw.io document.
+    Read a draw.io document.
 
     This class understands the draw.io XML format and converts it into
     the internal TransitionModel.

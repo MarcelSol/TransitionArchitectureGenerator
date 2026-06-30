@@ -1,5 +1,5 @@
 import typer
-from tag.importer import DrawioImporter
+from tag.reader import DrawioReader
 from rich import print
 from tag.model import TransitionModel
 from tag import __version__
@@ -11,9 +11,9 @@ app = typer.Typer(
 
 @app.command()
 def analyse(file: str):
-    importer = DrawioImporter(file)
+    reader = DrawioReader(file)
 
-    tree = importer.load()
+    tree = reader.load()
         
     root = tree.getroot()
         
@@ -23,6 +23,11 @@ def analyse(file: str):
 
     print()
     print(f"Pages : {diagram_count}")
+    for diagram in root.findall("diagram"):
+        print(
+            f"Name: {diagram.get('name')}, "
+            f"ID: {diagram.get('id')}"
+    )
 
 @app.command()
 def version():
