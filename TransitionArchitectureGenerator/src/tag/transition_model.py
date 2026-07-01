@@ -42,6 +42,6 @@ class TransitionInterface:
 @dataclass(slots=True)
 class TransitionModel:
 
-    nodes: list[TransitionNode] = field(default_factory=list)
+    nodes: dict[str, TransitionNode] = field(default_factory=dict)
 
     interfaces: list[TransitionInterface] = field(default_factory=list)

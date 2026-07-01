@@ -11,7 +11,6 @@ app = typer.Typer(
     help="Transition Architecture Generator"
 )
 
-
 @app.command()
 def analyse(file: str):
 
@@ -66,6 +65,25 @@ def analyse(file: str):
         print(f"Nodes       : {nodes}")
         print(f"Interfaces  : {interfaces}")
         print(f"Groups      : {groups}")
+
+        print()
+
+        print("Catalogue")
+
+        print("---------")
+
+        for node in sorted(
+            transition.nodes.values(),
+            key=lambda n: n.name.lower()
+        ):
+
+            pages = ", ".join(
+                sorted(node.visible_on)
+            )
+
+            print(
+                f"{node.name:<35} {pages}"
+            )
 
 @app.command()
 def version():
