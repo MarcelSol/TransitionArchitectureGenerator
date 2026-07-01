@@ -41,6 +41,27 @@ class DrawioDocument:
     def cell_count(self):
         return sum(len(p.cells) for p in self.pages)
 
+    @property
+    def nodes(self):
+
+        return [
+            cell
+            for page in self.pages
+            for cell in page.cells
+            if cell.vertex
+        ]
+
+
+    @property
+    def interfaces(self):
+
+        return [
+            cell
+            for page in self.pages
+            for cell in page.cells
+            if cell.edge
+    ]
+
 
 @dataclass(slots=True)
 class DrawioCell:
