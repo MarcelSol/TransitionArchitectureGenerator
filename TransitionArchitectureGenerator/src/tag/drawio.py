@@ -40,3 +40,25 @@ class DrawioDocument:
     @property
     def cell_count(self):
         return sum(len(p.cells) for p in self.pages)
+
+
+@dataclass(slots=True)
+class DrawioCell:
+    id: str
+
+    value: str = ""
+
+    style: dict[str, str] = field(default_factory=dict)
+
+    vertex: bool = False
+    edge: bool = False
+
+    source: str | None = None
+    target: str | None = None
+
+    parent: str | None = None
+
+    x: float = 0
+    y: float = 0
+    width: float = 0
+    height: float = 0

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from lxml import etree
 
-from tag.drawio import DrawioDocument, DrawioPage
+from tag.drawio import DrawioDocument, DrawioPage, DrawioCell
 from tag.logger import logger
 
 
@@ -44,6 +44,44 @@ class DrawioReader:
                 name=diagram.get("name", "")
             )
 
+            root = diagram[0]
+
+            for cell in root.iter("mxCell"):
+            
+                drawio_cell = DrawioCell(
+                    id=cell.get("id", ""),
+                    value=cell.get("value", ""),
+                    style=self.parse_style(
+                        cell.get("style", "")
+                    ),
+                    vertex=cell.get("vertex") == "1",
+                    edge=cell.get("edge") == "1",
+                    source=cell.get("source"),
+                    target=cell.get("target"),
+                    parent=cell.get("parent")
+                )
+            
+                geometry = cell.find("mxGeometry")
+            
+                if geometry is not None:
+                    drawio_cell.x = float(
+                        geometry.get("x", 0)
+                    )
+            
+                    drawio_cell.y = float(
+                        geometry.get("y", 0)
+                    )
+            
+                    drawio_cell.width = float(
+                        geometry.get("width", 0)
+                    )
+            
+                    drawio_cell.height = float(
+                        geometry.get("height", 0)
+                    )
+            
+                page.cells.append(drawio_cell)
+            
             document.pages.append(page)
 
         logger.info(
@@ -52,3 +90,22 @@ class DrawioReader:
         )
 
         return document
+
+    @staticmethod
+    def parse_style(style: str) -> dict[str, str]:
+
+        result = {}
+
+        if not style:
+            return result
+
+        for item in style.split(";"):
+
+            if "=" not in item:
+                continue
+
+            key, value = item.split("=", 1)
+
+            result[key] = value
+
+        return result
