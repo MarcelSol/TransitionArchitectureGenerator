@@ -3,6 +3,7 @@ Utilities for converting labels from Draw.io into a clean,
 consistent representation for the Transition Model.
 """
 
+from tag.normalization import NORMALIZATION_DICTIONARY
 from html import unescape
 import re
 
@@ -33,14 +34,6 @@ class LabelNormalizer:
         "PDF",
     }
 
-    NORMALIZATION_DICTIONARY = {
-        "Crewplanner": "Crew Planner",
-        "Crewhr": "Crew HR",
-        "Fileadapter": "File Adapter",
-        "Crewcheck-in": "Crew Check-in",
-        "Icrew": "ICrew",
-        "Apis": "APIs",
-    }
 
     @classmethod
     def normalize(cls, label: str) -> str:
@@ -99,7 +92,7 @@ class LabelNormalizer:
 
         normalized = " ".join(words)
 
-        for old, new in cls.NORMALIZATION_DICTIONARY.items():
+        for old, new in NORMALIZATION_DICTIONARY.items():
             normalized = normalized.replace(old, new)
 
         return normalized

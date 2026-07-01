@@ -4,6 +4,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 
+class NodeCategory(Enum):
+    UNKNOWN = "Unknown"
+    EXTERNAL = "External"
+    INTEGRATION = "Integration"
+    TRANSACTIONAL = "Transactional"
+    MASTER_DATA = "Master Data"
+
 class InterfaceDirection(Enum):
     ONE_WAY = "one_way"
     TWO_WAY = "two_way"
@@ -13,14 +20,25 @@ class TransferType(Enum):
     AUTOMATED = "automated"
     MANUAL = "manual"
 
+@dataclass(frozen=True, slots=True)
+class InterfaceKey:
+    source: str
+    target: str
+
+    direction: InterfaceDirection
+    transfer_type: TransferType
 
 @dataclass(slots=True)
 class TransitionNode:
+
     id: str
+
     name: str
 
-    width: float
-    height: float
+    category: NodeCategory = NodeCategory.UNKNOWN
+
+    width: float = 0.0
+    height: float = 0.0
 
     visible_on: set[str] = field(default_factory=set)
 
@@ -38,10 +56,12 @@ class TransitionInterface:
 
     visible_on: set[str] = field(default_factory=set)
 
-
 @dataclass(slots=True)
 class TransitionModel:
 
     nodes: dict[str, TransitionNode] = field(default_factory=dict)
 
-    interfaces: list[TransitionInterface] = field(default_factory=list)
+    interfaces: dict[
+        InterfaceKey,
+        TransitionInterface
+    ] = field(default_factory=dict)

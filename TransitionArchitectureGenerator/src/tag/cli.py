@@ -2,17 +2,29 @@ import typer
 from rich import print
 
 from tag import __version__
-from tag.transition_model import TransitionModel
+from tag.transition_model import TransitionModel, InterfaceDirection, TransferType
 from tag.reader import DrawioReader
 from tag.classifier import CellClassifier
 from tag.builder import TransitionModelBuilder
+from tag.catalog import CatalogWriter
+from tag.pipeline import Pipeline
 
 app = typer.Typer(
     help="Transition Architecture Generator"
 )
 
 @app.command()
-def analyse(file: str):
+def catalog(file: str):
+
+    print(f"[green]TAG[/green] version {__version__}")
+    print()
+
+    model = Pipeline.load(file)
+
+    CatalogWriter.print(model)
+
+@app.command()
+def analyze(file: str):
 
     print(f"[green]TAG[/green] version {__version__}")
     print()
@@ -66,24 +78,6 @@ def analyse(file: str):
         print(f"Interfaces  : {interfaces}")
         print(f"Groups      : {groups}")
 
-        print()
-
-        print("Catalogue")
-
-        print("---------")
-
-        for node in sorted(
-            transition.nodes.values(),
-            key=lambda n: n.name.lower()
-        ):
-
-            pages = ", ".join(
-                sorted(node.visible_on)
-            )
-
-            print(
-                f"{node.name:<35} {pages}"
-            )
 
 @app.command()
 def version():
