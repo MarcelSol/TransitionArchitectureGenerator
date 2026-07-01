@@ -1,8 +1,9 @@
 import typer
-from tag.reader import DrawioReader
 from rich import print
-from tag.model import TransitionModel
+
 from tag import __version__
+from tag.model import TransitionModel
+from tag.reader import DrawioReader
 
 app = typer.Typer(
     help="Transition Architecture Generator"
@@ -11,23 +12,23 @@ app = typer.Typer(
 
 @app.command()
 def analyse(file: str):
+
+    print(f"[green]TAG[/green] version {__version__}")
+    print()
+
     reader = DrawioReader(file)
 
-    tree = reader.load()
-        
-    root = tree.getroot()
-        
-    print()
-    
-    diagram_count = len(root.findall("diagram"))
+    document = reader.read()
 
+    print(f"Input file : {file}")
     print()
-    print(f"Pages : {diagram_count}")
-    for diagram in root.findall("diagram"):
-        print(
-            f"Name: {diagram.get('name')}, "
-            f"ID: {diagram.get('id')}"
-    )
+
+    print(f"Pages       : {document.page_count}")
+    print(f"Cells       : {document.cell_count}")
+
+    for page in document.pages:
+        print(f"  {page.name}")
+
 
 @app.command()
 def version():
