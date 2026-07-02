@@ -59,6 +59,12 @@ class TransitionInterface:
 @dataclass(slots=True)
 class TransitionModel:
 
+    #
+    # Ordered list of milestones (Draw.io pages).
+    # The order is significant and is preserved from the input file.
+    #
+    milestones: list[str] = field(default_factory=list)
+
     nodes: dict[str, TransitionNode] = field(default_factory=dict)
 
     interfaces: dict[

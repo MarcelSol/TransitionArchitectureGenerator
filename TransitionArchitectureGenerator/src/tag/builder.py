@@ -22,6 +22,11 @@ class TransitionModelBuilder:
         drawio_to_tag = {}
 
         for page in document.pages:
+            #
+            # Preserve milestone order.
+            #
+            model.milestones.append(page.name)
+
 
             #
             # Nodes

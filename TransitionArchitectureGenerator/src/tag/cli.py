@@ -4,14 +4,54 @@ from rich import print
 from tag import __version__
 from tag.transition_model import TransitionModel, InterfaceDirection, TransferType
 from tag.reader import DrawioReader
+from tag.excel_exporter import ExcelExporter
 from tag.classifier import CellClassifier
 from tag.builder import TransitionModelBuilder
 from tag.catalog import CatalogWriter
 from tag.pipeline import Pipeline
+from pathlib import Path
+
+INPUT_FOLDER = "input"
+OUTPUT_FOLDER = "output"
 
 app = typer.Typer(
     help="Transition Architecture Generator"
 )
+
+@app.command()
+def export(input: str):
+    """
+    Export the transition model to an Excel workbook.
+    """
+
+    print(f"[green]TAG[/green] version {__version__}")
+    print()
+
+    model = Pipeline.load(input)
+
+    input_path = Path(input)
+
+    #
+    # The output directory is a sister directory of the input directory.
+    #
+    output_dir = input_path.parent.parent / OUTPUT_FOLDER
+
+    output_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    output_file = output_dir / (
+        input_path.stem + ".xlsx"
+    )
+
+    ExcelExporter.export(
+        model,
+        str(output_file),
+    )
+
+    print()
+    print(f"Workbook written to {output_file}")
 
 @app.command()
 def catalog(file: str):
