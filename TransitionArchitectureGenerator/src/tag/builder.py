@@ -13,6 +13,98 @@ from tag.identifier_generator import IdentifierGenerator
 
 class TransitionModelBuilder:
 
+
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _compute_lifecycle(
+        model: TransitionModel,
+    ) -> None:
+
+        milestones = model.milestones
+
+        #
+        # Nodes
+        #
+        for node in model.nodes.values():
+
+            node.first_appears = TransitionModelBuilder._first_visible(
+                node.visible_on,
+                milestones,
+            )
+
+            node.retired_in = TransitionModelBuilder._retired_in(
+                node.visible_on,
+                milestones,
+            )
+
+        #
+        # Interfaces
+        #
+        for interface in model.interfaces.values():
+
+            interface.first_appears = TransitionModelBuilder._first_visible(
+                interface.visible_on,
+                milestones,
+            )
+
+            interface.retired_in = TransitionModelBuilder._retired_in(
+                interface.visible_on,
+                milestones,
+            )
+
+    # ---------------------------------------------------------------------
+
+    @staticmethod
+    def _first_visible(
+        visible_on: set[str],
+        milestones: list[str],
+    ) -> str:
+
+        for milestone in milestones:
+
+            if milestone in visible_on:
+                return milestone
+
+        return ""
+
+    # ---------------------------------------------------------------------
+
+    @staticmethod
+    def _last_visible(
+        visible_on: set[str],
+        milestones: list[str],
+    ) -> str:
+
+        last = ""
+
+        for milestone in milestones:
+
+            if milestone in visible_on:
+                last = milestone
+
+        return last
+
+
+    @staticmethod
+    def _retired_in(
+        visible_on: set[str],
+        milestones: list[str],
+    ) -> str:
+
+        seen = False
+
+        for milestone in milestones:
+
+            if milestone in visible_on:
+                seen = True
+
+            elif seen:
+                return milestone
+
+        return ""
+
+
     def build(
         self,
         document: DrawioDocument,
@@ -121,17 +213,6 @@ class TransitionModelBuilder:
                 #
                 # Build the key.
                 #
-                print(f"Draw.io source : {cell.source}")
-                print(f"Draw.io target : {cell.target}")
-                print(f"TAG source     : {source_id}")
-                print(f"TAG target     : {target_id}")
-                aa = IdentifierGenerator.interface_id(
-                            source_id,
-                            target_id,
-                        )
-                print(f"interface target     : {aa}")
-                print()
-
                 key = InterfaceKey(
                     source=source_id,
                     target=target_id,
@@ -162,4 +243,6 @@ class TransitionModelBuilder:
 
                 interface.visible_on.add(page.name)
 
+
+        TransitionModelBuilder._compute_lifecycle(model)
         return model

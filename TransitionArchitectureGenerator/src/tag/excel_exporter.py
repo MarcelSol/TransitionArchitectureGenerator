@@ -9,12 +9,16 @@ from __future__ import annotations
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from tag.builder import TransitionModelBuilder
 from tag.transition_model import (
     TransitionModel,
     NodeCategory,
     InterfaceDirection,
     TransferType,
 )
+
+from tag.validation import Validator
+from tag.validation_report import ValidationSeverity
 
 
 class ExcelExporter:
@@ -26,6 +30,7 @@ class ExcelExporter:
     ) -> None:
 
         workbook = Workbook()
+        report = Validator.validate(model)
 
         #
         # Remove the default worksheet created by openpyxl.
@@ -45,6 +50,11 @@ class ExcelExporter:
         ExcelExporter._write_summary(
             workbook,
             model,
+        )
+
+        ExcelExporter._write_validation_sheet(
+            workbook,
+            report,
         )
 
         workbook.save(filename)
@@ -80,7 +90,7 @@ class ExcelExporter:
             key=lambda n: n.name.lower(),
         ):
 
-            first = ExcelExporter._first_visible(
+            first = TransitionModelBuilder._first_visible(
                 node.visible_on,
                 milestones,
             )
@@ -145,56 +155,6 @@ class ExcelExporter:
     # ---------------------------------------------------------------------
 
     @staticmethod
-    def _first_visible(
-        visible_on: set[str],
-        milestones: list[str],
-    ) -> str:
-
-        for milestone in milestones:
-
-            if milestone in visible_on:
-                return milestone
-
-        return ""
-
-    # ---------------------------------------------------------------------
-
-    @staticmethod
-    def _last_visible(
-        visible_on: set[str],
-        milestones: list[str],
-    ) -> str:
-
-        last = ""
-
-        for milestone in milestones:
-
-            if milestone in visible_on:
-                last = milestone
-
-        return last
-
-    @staticmethod
-    def _retired_in(
-        visible_on: set[str],
-        milestones: list[str],
-    ) -> str:
-
-        seen = False
-
-        for milestone in milestones:
-
-            if milestone in visible_on:
-                seen = True
-
-            elif seen:
-                return milestone
-
-        return ""
-
-    # ---------------------------------------------------------------------
-
-    @staticmethod
     def _write_interfaces(
         workbook: Workbook,
         model: TransitionModel,
@@ -233,7 +193,7 @@ class ExcelExporter:
             ),
         ):
 
-            first = ExcelExporter._first_visible(
+            first = TransitionModelBuilder._first_visible(
                 interface.visible_on,
                 milestones,
             )
@@ -319,7 +279,7 @@ class ExcelExporter:
 
             for node in model.nodes.values():
 
-                first = ExcelExporter._first_visible(
+                first = TransitionModelBuilder._first_visible(
                     node.visible_on,
                     milestones,
                 )
@@ -344,7 +304,7 @@ class ExcelExporter:
 
             for interface in model.interfaces.values():
 
-                first = ExcelExporter._first_visible(
+                first = TransitionModelBuilder._first_visible(
                     interface.visible_on,
                     milestones,
                 )
@@ -380,3 +340,82 @@ class ExcelExporter:
 
         ExcelExporter._auto_width(sheet)
 
+    # ---------------------------------------------------------------------
+
+    @staticmethod
+    def _write_validation_sheet(
+        workbook: Workbook,
+        report: ValidationReport,
+    ) -> None:
+
+        sheet = workbook.create_sheet("Validation")
+
+        #
+        # Summary
+        #
+        sheet.append(["Metric", "Count"])
+        sheet.append(["Errors", report.error_count])
+        sheet.append(["Warnings", report.warning_count])
+        sheet.append([])
+
+        #
+        # Detail header
+        #
+        headers = [
+            "Severity",
+            "Rule",
+            "Object ID",
+            "Object Name",
+            "Page",
+            "Message",
+        ]
+
+        sheet.append(headers)
+
+        #
+        # Make the header bold.
+        #
+        bold = Font(bold=True)
+
+        for cell in sheet[4]:
+            cell.font = bold
+
+        #
+        # Freeze the header.
+        #
+        sheet.freeze_panes = "A5"
+
+        #
+        # Sort findings:
+        # Errors first, then warnings,
+        # then by rule, object and page.
+        #
+        severity_order = {
+            ValidationSeverity.ERROR: 0,
+            ValidationSeverity.WARNING: 1,
+        }
+
+        issues = sorted(
+            report.issues,
+            key=lambda i: (
+                severity_order[i.severity],
+                i.rule,
+                i.object_id,
+                i.page,
+            ),
+        )
+
+        for issue in issues:
+
+            sheet.append(
+                [
+                    issue.severity.value,
+                    issue.rule,
+                    issue.object_id,
+                    issue.object_name,
+                    issue.page,
+                    issue.message,
+                ]
+            )
+
+        ExcelExporter._auto_width(sheet)

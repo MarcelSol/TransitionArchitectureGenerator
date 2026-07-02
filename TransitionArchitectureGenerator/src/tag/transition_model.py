@@ -42,6 +42,9 @@ class TransitionNode:
 
     visible_on: set[str] = field(default_factory=set)
 
+    first_appears: str = ""
+
+    retired_in: str = ""
 
 @dataclass(slots=True)
 class TransitionInterface:
@@ -55,6 +58,10 @@ class TransitionInterface:
     transfer_type: TransferType
 
     visible_on: set[str] = field(default_factory=set)
+
+    first_appears: str = ""
+
+    retired_in: str = ""
 
 @dataclass(slots=True)
 class TransitionModel:

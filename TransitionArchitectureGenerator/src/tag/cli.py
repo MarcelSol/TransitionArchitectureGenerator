@@ -9,6 +9,8 @@ from tag.classifier import CellClassifier
 from tag.builder import TransitionModelBuilder
 from tag.catalog import CatalogWriter
 from tag.pipeline import Pipeline
+from tag.validation import Validator
+from tag.validation_report import ValidationSeverity
 from pathlib import Path
 
 INPUT_FOLDER = "input"
@@ -17,6 +19,60 @@ OUTPUT_FOLDER = "output"
 app = typer.Typer(
     help="Transition Architecture Generator"
 )
+
+@app.command()
+def validate(input: str):
+
+    print(f"[green]TAG[/green] version {__version__}")
+    print()
+
+    model = Pipeline.load(input)
+
+    report = Validator.validate(model)
+
+    if report.error_count == 0 and report.warning_count == 0:
+
+        print("Validation passed.")
+        return
+
+    print()
+
+    print("Errors")
+
+    for issue in report.issues:
+
+        if issue.severity != ValidationSeverity.ERROR:
+            continue
+
+        print(
+            f"{issue.rule:<6}"
+            f"{issue.object_id:<50}"
+            f"{issue.page:<35}"
+            f"{issue.message}"
+        )
+
+    print()
+
+    print("Warnings")
+
+    for issue in report.issues:
+
+        if issue.severity != ValidationSeverity.WARNING:
+            continue
+
+        print(
+            f"{issue.rule:<6}"
+            f"{issue.object_id:<50}"
+            f"{issue.page:<35}"
+            f"{issue.message}"
+        )
+
+    print()
+
+    print(
+        f"{report.error_count} error(s), "
+        f"{report.warning_count} warning(s)"
+    )
 
 @app.command()
 def export(input: str):
