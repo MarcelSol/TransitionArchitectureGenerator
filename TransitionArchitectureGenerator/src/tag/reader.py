@@ -12,7 +12,7 @@ from pathlib import Path
 
 from lxml import etree
 
-from tag.drawio import DrawioDocument, DrawioPage, DrawioCell
+from tag.drawio import DrawioDocument, DrawioPage, DrawioCell, DrawioPoint
 from tag.logger import logger
 
 
@@ -80,6 +80,20 @@ class DrawioReader:
                         geometry.get("height", 0)
                     )
             
+                    source_point = geometry.find(
+                        "mxPoint[@as='sourcePoint']"
+                    )
+
+                    if source_point is not None:
+                        drawio_cell.source_point = DrawioPoint.from_xml(source_point)
+
+                    target_point = geometry.find(
+                        "mxPoint[@as='targetPoint']"
+                    )
+
+                    if target_point is not None:
+                        drawio_cell.target_point = DrawioPoint.from_xml(target_point)
+
                 page.cells.append(drawio_cell)
             
             document.pages.append(page)

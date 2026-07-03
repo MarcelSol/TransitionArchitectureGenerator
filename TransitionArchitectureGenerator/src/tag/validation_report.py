@@ -7,6 +7,7 @@ from enum import Enum
 class ValidationSeverity(Enum):
     ERROR = "Error"
     WARNING = "Warning"
+    INFO = "Info"
 
 
 @dataclass(slots=True)
@@ -67,4 +68,13 @@ class ValidationReport:
             1
             for issue in self.issues
             if issue.severity == ValidationSeverity.WARNING
+        )
+
+    @property
+    def info_count(self) -> int:
+
+        return sum(
+            1
+            for issue in self.issues
+            if issue.severity == ValidationSeverity.INFO
         )

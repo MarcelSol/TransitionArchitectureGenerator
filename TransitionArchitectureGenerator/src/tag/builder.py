@@ -1,4 +1,7 @@
+import math
+
 from tag.drawio import DrawioDocument
+from tag.validation_report import ValidationSeverity
 from tag.transition_model import (
     TransitionModel,
     TransitionNode,
@@ -11,8 +14,79 @@ from tag.label_normalizer import LabelNormalizer
 from tag.color_classifier import ColorClassifier
 from tag.identifier_generator import IdentifierGenerator
 
+SNAP_DISTANCE = 10.0
+
 class TransitionModelBuilder:
 
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _distance_to_node(
+        x: float,
+        y: float,
+        node: DrawioCell,
+    ) -> float:
+
+        #
+        # Find the nearest point on the node rectangle.
+        #
+
+        if x < node.x:
+            nearest_x = node.x
+        elif x > node.x + node.width:
+            nearest_x = node.x + node.width
+        else:
+            nearest_x = x
+
+        if y < node.y:
+            nearest_y = node.y
+        elif y > node.y + node.height:
+            nearest_y = node.y + node.height
+        else:
+            nearest_y = y
+
+        dx = x - nearest_x
+        dy = y - nearest_y
+
+        return math.hypot(dx, dy)
+
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _find_nearest_node(
+        x: float,
+        y: float,
+        cells: list[DrawioCell],
+        drawio_to_tag,
+    ) -> tuple[DrawioCell | None, float]:
+
+        nearest_node = None
+        nearest_distance = float("inf")
+
+        for node in cells:
+            if not node.vertex:
+                continue
+
+            #
+            # Only consider nodes that actually became TAG nodes.
+            #
+            if node.id not in drawio_to_tag:
+                continue
+
+            distance = (
+                TransitionModelBuilder._distance_to_node(
+                    x,
+                    y,
+                    node,
+                )
+            )
+
+            if distance < nearest_distance:
+
+                nearest_distance = distance
+                nearest_node = node
+
+        return nearest_node, nearest_distance
 
     # -----------------------------------------------------------------
 
@@ -178,19 +252,103 @@ class TransitionModelBuilder:
 
                 #
                 # Ignore incomplete interfaces.
+                # But report the error.
                 #
+                source_id = drawio_to_tag.get(cell.source, "")
+                target_id = drawio_to_tag.get(cell.target, "")
+                incomplete = False
 
-                if (
-                    not cell.source
-                    or not cell.target
-                    or cell.source not in drawio_to_tag
-                    or cell.target not in drawio_to_tag
-                ):
+                if not cell.source or cell.source not in drawio_to_tag:
+
+                    source_node, distance = (
+                        TransitionModelBuilder._find_nearest_node(
+                            cell.source_point.x,
+                            cell.source_point.y,
+                            page.cells,
+                            drawio_to_tag,
+                        )
+                    )
+
+                    if (
+                        source_node is not None
+                        and distance <= SNAP_DISTANCE
+                    ):
+
+                        source_id = drawio_to_tag[source_node.id]
+
+                        model.report.add(
+                            severity=ValidationSeverity.INFO,
+                            rule="V010",
+                            object_id=cell.id,
+                            object_name="",
+                            page=page.name,
+                            message=(
+                                f"Source snapped to "
+                                f"{source_id} "
+                                f"({distance:.1f}px)"
+                            ),
+                        )
+
+                    else:
+
+                        model.report.add(
+                            severity=ValidationSeverity.ERROR,
+                            rule="V001",
+                            object_id=cell.id,
+                            object_name="",
+                            page=page.name,
+                            message="Connector has no source node.",
+                        )
+
+                        incomplete = True
+
+                if not cell.target or cell.target not in drawio_to_tag:
+
+                    target_node, distance = (
+                        TransitionModelBuilder._find_nearest_node(
+                            cell.target_point.x,
+                            cell.target_point.y,
+                            page.cells,
+                            drawio_to_tag,
+                        )
+                    )
+
+                    if (
+                        target_node is not None
+                        and distance <= SNAP_DISTANCE
+                    ):
+
+                        target_id = drawio_to_tag[target_node.id]
+
+                        model.report.add(
+                            severity=ValidationSeverity.INFO,
+                            rule="V011",
+                            object_id=cell.id,
+                            object_name="",
+                            page=page.name,
+                            message=(
+                                f"target snapped to "
+                                f"{target_id} "
+                                f"({distance:.1f}px)"
+                            ),
+                        )
+
+                    else:
+
+                        model.report.add(
+                            severity=ValidationSeverity.ERROR,
+                            rule="V002",
+                            object_id=cell.id,
+                            object_name="",
+                            page=page.name,
+                            message="Connector has no target node.",
+                        )
+
+                        incomplete = True
+
+                if incomplete:
                     continue
 
-
-                source_id = drawio_to_tag[cell.source]
-                target_id = drawio_to_tag[cell.target]
 
                 #
                 # Direction

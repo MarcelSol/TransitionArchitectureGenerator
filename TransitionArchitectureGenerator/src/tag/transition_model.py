@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from tag.validation_report import ValidationReport
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -78,3 +79,7 @@ class TransitionModel:
         InterfaceKey,
         TransitionInterface
     ] = field(default_factory=dict)
+
+    report: ValidationReport = field(
+        default_factory=ValidationReport
+    )

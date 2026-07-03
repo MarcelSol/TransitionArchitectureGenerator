@@ -69,9 +69,26 @@ def validate(input: str):
 
     print()
 
+    print("Info")
+
+    for issue in report.issues:
+
+        if issue.severity != ValidationSeverity.INFO:
+            continue
+
+        print(
+            f"{issue.rule:<6}"
+            f"{issue.object_id:<50}"
+            f"{issue.page:<35}"
+            f"{issue.message}"
+        )
+
+    print()
+
     print(
         f"{report.error_count} error(s), "
-        f"{report.warning_count} warning(s)"
+        f"{report.warning_count} warning(s), "
+        f"{report.info_count} info(s)"
     )
 
 @app.command()

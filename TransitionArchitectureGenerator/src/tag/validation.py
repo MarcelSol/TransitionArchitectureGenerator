@@ -15,7 +15,7 @@ class Validator:
         model: TransitionModel,
     ) -> ValidationReport:
 
-        report = ValidationReport()
+        report = model.report
 
         #
         # Validation rules

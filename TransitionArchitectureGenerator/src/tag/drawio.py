@@ -1,26 +1,5 @@
 from dataclasses import dataclass, field
 
-
-@dataclass(slots=True)
-class DrawioCell:
-    id: str
-    value: str = ""
-    style: str = ""
-
-    vertex: bool = False
-    edge: bool = False
-
-    source: str | None = None
-    target: str | None = None
-
-    parent: str | None = None
-
-    x: float = 0
-    y: float = 0
-    width: float = 0
-    height: float = 0
-
-
 @dataclass(slots=True)
 class DrawioPage:
     id: str
@@ -64,6 +43,20 @@ class DrawioDocument:
 
 
 @dataclass(slots=True)
+class DrawioPoint:
+
+    x: float
+    y: float
+
+    @staticmethod
+    def from_xml(element) -> "DrawioPoint":
+
+        return DrawioPoint(
+            x=float(element.get("x", 0)),
+            y=float(element.get("y", 0)),
+        )
+
+@dataclass(slots=True)
 class DrawioCell:
     id: str
 
@@ -78,6 +71,9 @@ class DrawioCell:
     target: str | None = None
 
     parent: str | None = None
+
+    source_point: DrawioPoint | None = None
+    target_point: DrawioPoint | None = None
 
     x: float = 0
     y: float = 0
