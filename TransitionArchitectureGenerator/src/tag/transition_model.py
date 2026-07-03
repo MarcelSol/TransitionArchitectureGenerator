@@ -30,6 +30,23 @@ class InterfaceKey:
     transfer_type: TransferType
 
 @dataclass(slots=True)
+class TransitionChild:
+
+    name: str
+
+    category: NodeCategory
+
+    x: float        # relative to container
+
+    y: float
+
+    width: float
+
+    height: float
+
+    visible_on: set[str] = field(default_factory=set)
+
+@dataclass(slots=True)
 class TransitionNode:
 
     id: str
@@ -47,6 +64,8 @@ class TransitionNode:
 
     retired_in: str = ""
 
+    children: list[TransitionChild] = field(default_factory=list)
+
 @dataclass(slots=True)
 class TransitionInterface:
     id: str
@@ -63,6 +82,8 @@ class TransitionInterface:
     first_appears: str = ""
 
     retired_in: str = ""
+
+    label: str | None = None
 
 @dataclass(slots=True)
 class TransitionModel:

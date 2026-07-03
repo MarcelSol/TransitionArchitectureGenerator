@@ -51,6 +51,25 @@ class CatalogWriter:
 
         node_lookup = CatalogWriter._node_lookup(model)
         
+
+        print(
+            f"{'Source':40} "
+            f"{'Dir':^5} "
+            f"{'Target':40} "
+            f"{'Type':10} "
+            f"{'Label':15} "
+            f"Milestones"
+        )
+
+        print(
+            f"{'-'*40} "
+            f"{'-'*5} "
+            f"{'-'*40} "
+            f"{'-'*10} "
+            f"{'-'*15} "
+            f"{'-'*30}"
+        )
+
         for interface in sorted(
             model.interfaces.values(),
             key=lambda i: (
@@ -74,12 +93,14 @@ class CatalogWriter:
 
             source = node_lookup[interface.source].name
             target = node_lookup[interface.target].name
+            label = interface.label or ""
 
             print(
                 f"{source:<40} "
                 f"{direction:^5} "
                 f"{target:<40} "
                 f"{transfer:<10} "
+                f"{label:<15} "
                 f"{pages}"
             )
 

@@ -75,7 +75,17 @@ class DrawioCell:
     source_point: DrawioPoint | None = None
     target_point: DrawioPoint | None = None
 
+    interface_label: str | None = None
+
     x: float = 0
     y: float = 0
     width: float = 0
     height: float = 0
+
+    @property
+    def is_interface_label(self) -> bool:
+
+        return (
+            self.vertex
+            and "edgeLabel" in self.style
+    )

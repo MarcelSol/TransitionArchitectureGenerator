@@ -21,6 +21,80 @@ class TransitionModelBuilder:
     # -----------------------------------------------------------------
 
     @staticmethod
+    def _attach_interface_labels(
+        page: DrawioPage,
+    ):
+
+        #
+        # Build a lookup by Draw.io id.
+        #
+
+        lookup = {
+            cell.id: cell
+            for cell in page.cells
+        }
+
+        #
+        # Copy the label text to the parent edge.
+        #
+
+        for cell in page.cells:
+
+            if not cell.is_interface_label:
+                continue
+
+            edge = lookup.get(cell.parent)
+
+            if edge is None:
+                continue
+
+            edge.interface_label = cell.value
+
+
+    @staticmethod
+    def _is_interface_label(
+        cell: DrawioCell,
+    ) -> bool:
+
+        return (
+            cell.vertex
+            and "edgeLabel" in cell.style
+        )
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def _contains(
+        parent: TransitionNode,
+        child: TransitionNode,
+    ) -> bool:
+
+        if parent.id == child.id:
+            return False
+
+        if (
+            parent.width <= child.width
+            or
+            parent.height <= child.height
+        ):
+            return False
+
+        return (
+            TransitionModelBuilder._distance_to_node(
+                child.x,
+                child.y,
+                parent,
+            ) == 0
+            and
+            TransitionModelBuilder._distance_to_node(
+                child.x + child.width,
+                child.y + child.height,
+                parent,
+            ) == 0
+        )
+
+    # -----------------------------------------------------------------
+
+    @staticmethod
     def _distance_to_node(
         x: float,
         y: float,
@@ -189,6 +263,13 @@ class TransitionModelBuilder:
 
         for page in document.pages:
             #
+            # Add the interface lablel if it exist,
+            #
+            TransitionModelBuilder._attach_interface_labels(
+                page
+            )
+
+            #
             # Preserve milestone order.
             #
             model.milestones.append(page.name)
@@ -199,6 +280,9 @@ class TransitionModelBuilder:
             #
 
             for cell in page.cells:
+                if cell.value == "Manual":
+                    print(cell.style)
+                    print(cell.is_interface_label)
 
                 if not cell.vertex:
                     continue
@@ -210,6 +294,10 @@ class TransitionModelBuilder:
                 name = LabelNormalizer.normalize(cell.value or "")
 
                 if not name:
+                    continue
+
+                if cell.is_interface_label:
+                    print("Interface label", cell)
                     continue
 
                 node_id = IdentifierGenerator.node_id(name)
@@ -240,6 +328,10 @@ class TransitionModelBuilder:
                 #
 
                 node.visible_on.add(page.name)
+
+            #
+            # Handle Composite nodes.
+            #
 
             #
             # Interfaces
@@ -395,6 +487,7 @@ class TransitionModelBuilder:
                         target=target_id,
                         direction=direction,
                         transfer_type=transfer_type,
+                        label=cell.interface_label,
                     )
 
                     model.interfaces[key] = interface

@@ -116,9 +116,10 @@ class DrawioReader:
         for item in style.split(";"):
 
             if "=" not in item:
-                continue
+                key, value = item, ""
+            else:
 
-            key, value = item.split("=", 1)
+                key, value = item.split("=", 1)
 
             result[key] = value
 
