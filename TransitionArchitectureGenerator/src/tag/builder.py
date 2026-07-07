@@ -5,6 +5,7 @@ from tag.validation_report import ValidationSeverity
 from tag.transition_model import (
     TransitionModel,
     TransitionNode,
+    TransitionChild,
     TransitionInterface,
     InterfaceDirection,
     TransferType,
@@ -17,6 +18,61 @@ from tag.identifier_generator import IdentifierGenerator
 SNAP_DISTANCE = 10.0
 
 class TransitionModelBuilder:
+
+    @staticmethod
+    def _find_container(
+        cell: DrawioCell,
+        page: DrawioPage,
+    ) -> DrawioCell | None:
+
+        lookup = {c.id: c for c in page.cells}
+        parent = lookup.get(cell.parent)
+
+        if (
+            parent is not None
+            and parent.vertex
+            and parent.value
+        ):
+            return parent
+
+        largest = None
+        largest_area = -1.0
+
+        for other in page.cells:
+
+            if other.id == cell.id:
+                continue
+
+            if not other.vertex:
+                continue
+
+            #
+            # Groups are only used for positioning.
+            #
+            if "group" in other.style:
+                continue
+
+            if TransitionModelBuilder._distance_to_node(
+                cell.x,
+                cell.y,
+                other,
+            ) != 0:
+                continue
+
+            if TransitionModelBuilder._distance_to_node(
+                cell.x + cell.width,
+                cell.y + cell.height,
+                other,
+            ) != 0:
+                continue
+
+            area = other.width * other.height
+
+            if area > largest_area:
+                largest = other
+                largest_area = area
+
+        return largest
 
     # -----------------------------------------------------------------
 
@@ -260,6 +316,7 @@ class TransitionModelBuilder:
 
         model = TransitionModel()
         drawio_to_tag = {}
+        child_owner = {}
 
         for page in document.pages:
             #
@@ -280,10 +337,6 @@ class TransitionModelBuilder:
             #
 
             for cell in page.cells:
-                if cell.value == "Manual":
-                    print(cell.style)
-                    print(cell.is_interface_label)
-
                 if not cell.vertex:
                     continue
 
@@ -297,46 +350,77 @@ class TransitionModelBuilder:
                     continue
 
                 if cell.is_interface_label:
-                    print("Interface label", cell)
                     continue
 
+                container = TransitionModelBuilder._find_container(
+                    cell,
+                    page,
+                )
+
                 node_id = IdentifierGenerator.node_id(name)
+
                 drawio_to_tag[cell.id] = node_id
 
                 #
-                # Existing node?
+                # Already known?
                 #
+
+                if node_id in child_owner:
+                    continue
 
                 node = model.nodes.get(node_id)
 
-                if node is None:
+                if node is not None:
+                    node.visible_on.add(page.name)
+                    continue
+
+                if container is None:
 
                     node = TransitionNode(
                         id=node_id,
                         name=name,
-
                         category=ColorClassifier.classify(cell.style),
-
-                        width=cell.width,
-                        height=cell.height,
                     )
 
                     model.nodes[node_id] = node
 
-                #
-                # Remember that this node exists on this page.
-                #
+                else:
 
-                node.visible_on.add(page.name)
+                    container_id = IdentifierGenerator.node_id(
+                        LabelNormalizer.normalize(container.value)
+                    )
 
-            #
-            # Handle Composite nodes.
-            #
+                    owner = model.nodes.get(container_id)
+
+                    if owner is None:
+
+                        owner = TransitionNode(
+                            id=container_id,
+                            name=LabelNormalizer.normalize(container.value),
+                            category=ColorClassifier.classify(container.style),
+                        )
+
+                        model.nodes[container_id] = owner
+
+                    owner.children.append(
+                        TransitionChild(
+                            id=node_id,
+                            name=name,
+                            category=ColorClassifier.classify(cell.style),
+                            x=cell.x - container.x,
+                            y=cell.y - container.y,
+                            width=cell.width,
+                            height=cell.height,
+                        )
+                    )
+
+                    child_owner[node_id] = container_id
+
+                    continue
 
             #
             # Interfaces
             #
-
             for cell in page.cells:
 
                 if not cell.edge:
@@ -348,6 +432,8 @@ class TransitionModelBuilder:
                 #
                 source_id = drawio_to_tag.get(cell.source, "")
                 target_id = drawio_to_tag.get(cell.target, "")
+                source_id = child_owner.get(source_id, source_id)
+                target_id = child_owner.get(target_id, target_id)
                 incomplete = False
 
                 if not cell.source or cell.source not in drawio_to_tag:
@@ -367,6 +453,7 @@ class TransitionModelBuilder:
                     ):
 
                         source_id = drawio_to_tag[source_node.id]
+                        source_id = child_owner.get(source_id, source_id)
 
                         model.report.add(
                             severity=ValidationSeverity.INFO,
@@ -411,6 +498,8 @@ class TransitionModelBuilder:
                     ):
 
                         target_id = drawio_to_tag[target_node.id]
+                        target_id = child_owner.get(target_id, target_id)
+
 
                         model.report.add(
                             severity=ValidationSeverity.INFO,

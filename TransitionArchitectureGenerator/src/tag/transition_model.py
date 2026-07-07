@@ -32,6 +32,8 @@ class InterfaceKey:
 @dataclass(slots=True)
 class TransitionChild:
 
+    id: str
+
     name: str
 
     category: NodeCategory

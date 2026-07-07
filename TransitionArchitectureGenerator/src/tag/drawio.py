@@ -77,6 +77,8 @@ class DrawioCell:
 
     interface_label: str | None = None
 
+    position_resolved: bool = False
+
     x: float = 0
     y: float = 0
     width: float = 0

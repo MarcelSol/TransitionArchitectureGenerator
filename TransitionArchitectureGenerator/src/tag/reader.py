@@ -23,6 +23,73 @@ class DrawioReader:
     At this stage the reader only extracts the pages.
     Later commits will populate each page with DrawioCells.
     """
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _resolve_group_positions(
+        page: DrawioPage,
+    ) -> None:
+
+        #
+        # Build lookup by id.
+        #
+
+        lookup = {
+            cell.id: cell
+            for cell in page.cells
+        }
+
+        #
+        # Resolve every cell.
+        #
+
+        for cell in page.cells:
+
+            DrawioReader._resolve_position(
+                cell,
+                lookup,
+            )
+
+
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _resolve_position(
+        cell: DrawioCell,
+        lookup: dict[str, DrawioCell],
+    ) -> None:
+
+        #
+        # Already resolved?
+        #
+
+        if cell.position_resolved:
+            return
+
+        #
+        # Resolve parent first.
+        #
+
+        if cell.parent:
+
+            parent = lookup.get(cell.parent)
+
+            if parent is not None:
+
+                DrawioReader._resolve_position(
+                    parent,
+                    lookup,
+                )
+
+                #
+                # Add the parent's position.
+                #
+                if "group" in parent.style:
+
+                    cell.x += parent.x
+                    cell.y += parent.y
+
+        cell.position_resolved = True
 
     def __init__(self, filename: str):
 
@@ -96,6 +163,10 @@ class DrawioReader:
 
                 page.cells.append(drawio_cell)
             
+                DrawioReader._resolve_group_positions(
+                    page
+                )
+
             document.pages.append(page)
 
         logger.info(

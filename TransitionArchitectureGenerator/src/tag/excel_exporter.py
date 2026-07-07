@@ -95,7 +95,7 @@ class ExcelExporter:
                 milestones,
             )
 
-            retired = ExcelExporter._retired_in(
+            retired = TransitionModelBuilder._retired_in(
                 node.visible_on,
                 milestones,
             )
@@ -198,7 +198,7 @@ class ExcelExporter:
                 milestones,
             )
 
-            last = ExcelExporter._last_visible(
+            last = TransitionModelBuilder._last_visible(
                 interface.visible_on,
                 milestones,
             )
@@ -284,7 +284,7 @@ class ExcelExporter:
                     milestones,
                 )
 
-                retired = ExcelExporter._retired_in(
+                retired = TransitionModelBuilder._retired_in(
                     node.visible_on,
                     milestones,
                 )
@@ -309,7 +309,7 @@ class ExcelExporter:
                     milestones,
                 )
 
-                last = ExcelExporter._last_visible(
+                last = TransitionModelBuilder._last_visible(
                     interface.visible_on,
                     milestones,
                 )
@@ -393,6 +393,7 @@ class ExcelExporter:
         severity_order = {
             ValidationSeverity.ERROR: 0,
             ValidationSeverity.WARNING: 1,
+            ValidationSeverity.INFO: 2,
         }
 
         issues = sorted(
