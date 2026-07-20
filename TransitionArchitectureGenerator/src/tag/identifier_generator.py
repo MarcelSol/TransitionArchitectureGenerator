@@ -35,11 +35,11 @@ class IdentifierGenerator:
         identifier = name.lower()
 
         #
-        # Replace every sequence of non-alphanumeric characters
+        # Replace every sequence of non-alphanumeric characters (excluding a dot)
         # with a single underscore.
         #
         identifier = re.sub(
-            r"[^a-z0-9]+",
+            r"[^\.a-z0-9]+",
             "_",
             identifier,
         )

@@ -465,6 +465,8 @@ class TransitionModelBuilder:
                                 f"Source snapped to "
                                 f"{source_id} "
                                 f"({distance:.1f}px)"
+                                f", Target is "
+                                f"{target_id} "
                             ),
                         )
 
@@ -511,6 +513,8 @@ class TransitionModelBuilder:
                                 f"target snapped to "
                                 f"{target_id} "
                                 f"({distance:.1f}px)"
+                                f", Source is "
+                                f"{source_id} "
                             ),
                         )
 
