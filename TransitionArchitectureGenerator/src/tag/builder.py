@@ -358,65 +358,64 @@ class TransitionModelBuilder:
                 )
 
                 node_id = IdentifierGenerator.node_id(name)
-
                 drawio_to_tag[cell.id] = node_id
 
                 #
                 # Already known?
                 #
-
                 if node_id in child_owner:
                     continue
 
                 node = model.nodes.get(node_id)
 
-                if node is not None:
-                    node.visible_on.add(page.name)
-                    continue
+                if node is None:
 
-                if container is None:
+                    if container is None:
 
-                    node = TransitionNode(
-                        id=node_id,
-                        name=name,
-                        category=ColorClassifier.classify(cell.style),
-                    )
-
-                    model.nodes[node_id] = node
-
-                else:
-
-                    container_id = IdentifierGenerator.node_id(
-                        LabelNormalizer.normalize(container.value)
-                    )
-
-                    owner = model.nodes.get(container_id)
-
-                    if owner is None:
-
-                        owner = TransitionNode(
-                            id=container_id,
-                            name=LabelNormalizer.normalize(container.value),
-                            category=ColorClassifier.classify(container.style),
-                        )
-
-                        model.nodes[container_id] = owner
-
-                    owner.children.append(
-                        TransitionChild(
+                        node = TransitionNode(
                             id=node_id,
                             name=name,
                             category=ColorClassifier.classify(cell.style),
-                            x=cell.x - container.x,
-                            y=cell.y - container.y,
-                            width=cell.width,
-                            height=cell.height,
                         )
-                    )
 
-                    child_owner[node_id] = container_id
+                        model.nodes[node_id] = node
 
-                    continue
+                    else:
+
+                        container_id = IdentifierGenerator.node_id(
+                            LabelNormalizer.normalize(container.value)
+                        )
+
+                        owner = model.nodes.get(container_id)
+
+                        if owner is None:
+
+                            owner = TransitionNode(
+                                id=container_id,
+                                name=LabelNormalizer.normalize(container.value),
+                                category=ColorClassifier.classify(container.style),
+                            )
+
+                            model.nodes[container_id] = owner
+                            owner.visible_on.add(page.name)
+
+                        owner.children.append(
+                            TransitionChild(
+                                id=node_id,
+                                name=name,
+                                category=ColorClassifier.classify(cell.style),
+                                x=cell.x - container.x,
+                                y=cell.y - container.y,
+                                width=cell.width,
+                                height=cell.height,
+                            )
+                        )
+
+                        child_owner[node_id] = container_id
+
+                        continue
+
+                node.visible_on.add(page.name)
 
             #
             # Interfaces
