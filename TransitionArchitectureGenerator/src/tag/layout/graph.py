@@ -36,6 +36,14 @@ class LayoutGraph:
 
     nodes: dict[str, LayoutNode] = field(default_factory=dict)
 
+    def __str__(self) -> str:
+
+        return (
+            f"LayoutGraph("
+            f"nodes={self.node_count}, "
+            f"edges={self.edge_count})"
+        )
+
     def add_node(self, node_id: str) -> None:
 
         if node_id not in self.nodes:
