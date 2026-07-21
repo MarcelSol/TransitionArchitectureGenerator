@@ -1,6 +1,7 @@
 """
 Graph representation used by the TAG layout engine.
 """
+
 from dataclasses import dataclass, field
 
 
@@ -11,18 +12,66 @@ class LayoutNode:
     """
 
     id: str
+    name: str
+
+    #
+    # Union of all neighbours across every page.
+    #
     neighbours: set[str] = field(default_factory=set)
 
+    #
+    # Neighbours visible on each individual milestone.
+    #
+    # Key:
+    #     milestone name
+    #
+    # Value:
+    #     immutable set of neighbouring node ids
+    #
+    page_neighbours: dict[str, frozenset[str]] = field(default_factory=dict)
+
+    #
+    # Complexity level assigned by the graph peeler.
+    #
+    # Complexity 1 represents leaves.
+    # Higher values represent increasingly central nodes.
+    #
+    complexity: int | None = None
+
+    #
+    # Order in which the node was peeled within its complexity level.
+    #
+    peel_round: int | None = None
+
+    @property
+    def level(self) -> str | None:
+        """
+        Return the hierarchical level of the node.
+
+        Examples:
+            1.1
+            2.3
+            3.5
+
+        Returns None if the node has not yet been analysed.
+        """
+
+        if self.complexity is None or self.peel_round is None:
+            return None
+
+        return f"{self.complexity}.{self.peel_round + 1}"
 
 @dataclass(slots=True)
 class LayoutGraph:
     """
     Undirected graph used by the layout engine.
     """
+
+    nodes: dict[str, LayoutNode] = field(default_factory=dict)
+
     @property
     def node_count(self) -> int:
         return len(self.nodes)
-
 
     @property
     def edge_count(self) -> int:
@@ -34,7 +83,19 @@ class LayoutGraph:
             ) // 2
         )
 
-    nodes: dict[str, LayoutNode] = field(default_factory=dict)
+    @property
+    def max_complexity(self) -> int:
+
+        complexities = [
+            node.complexity
+            for node in self.nodes.values()
+            if node.complexity is not None
+        ]
+
+        if not complexities:
+            return 0
+
+        return max(complexities)
 
     def __str__(self) -> str:
 
@@ -44,10 +105,17 @@ class LayoutGraph:
             f"edges={self.edge_count})"
         )
 
-    def add_node(self, node_id: str) -> None:
+    def add_node(
+        self,
+        node_id: str,
+        name: str,
+    ) -> None:
 
         if node_id not in self.nodes:
-            self.nodes[node_id] = LayoutNode(id=node_id)
+            self.nodes[node_id] = LayoutNode(
+                id=node_id,
+                name=name,
+            )
 
     def add_edge(
         self,
@@ -57,9 +125,6 @@ class LayoutGraph:
 
         if source == target:
             return
-
-        self.add_node(source)
-        self.add_node(target)
 
         self.nodes[source].neighbours.add(target)
         self.nodes[target].neighbours.add(source)
@@ -73,21 +138,59 @@ class LayoutGraph:
             "Layout Graph",
             "============",
             "",
-            f"Nodes : {self.node_count}",
-            f"Edges : {self.edge_count}",
+            f"Nodes           : {self.node_count}",
+            f"Edges           : {self.edge_count}",
+            f"Max complexity  : {self.max_complexity}",
             "",
         ]
 
-        for node in sorted(self.nodes.values(), key=lambda n: n.id):
-            lines.append(node.id)
+        for complexity in range(1, self.max_complexity + 1):
 
-            if node.neighbours:
-                for neighbour in sorted(node.neighbours):
-                    lines.append(f"    -> {neighbour}")
-            else:
-                lines.append("    (isolated)")
+            nodes = sorted(
+                (
+                    node
+                    for node in self.nodes.values()
+                    if node.complexity == complexity
+                ),
+                key=lambda node: (
+                    node.peel_round if node.peel_round is not None else -1,
+                    node.name.casefold(),
+                ),
+            )
 
+            if not nodes:
+                continue
+
+            lines.append("-" * 60)
+            lines.append(
+                f"Complexity {complexity} ({len(nodes)})"
+            )
+            lines.append("-" * 60)
             lines.append("")
 
-        return "\n".join(lines)
+            for node in nodes:
 
+                lines.append(node.name)
+
+                lines.append(
+                    f"    Level      : {node.level}"
+                )
+
+                if node.neighbours:
+
+                    for neighbour in sorted(node.neighbours):
+
+                        neighbour_name = (
+                            self.nodes[neighbour].name
+                        )
+
+                        lines.append(
+                            f"    -> {neighbour_name}"
+                        )
+
+                else:
+                    lines.append("    (isolated)")
+
+                lines.append("")
+
+        return "\n".join(lines)

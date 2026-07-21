@@ -12,6 +12,7 @@ from tag.pipeline import Pipeline
 from tag.validation import Validator
 from tag.validation_report import ValidationSeverity
 from tag.layout.graph_builder import LayoutGraphBuilder
+from tag.layout.graph_peeler import GraphPeeler
 from pathlib import Path
 
 INPUT_FOLDER = "input"
@@ -149,6 +150,8 @@ def analyze(file: str):
 
     transition = Pipeline.load(file)
     graph = LayoutGraphBuilder.build(transition)
+
+    GraphPeeler.peel(graph)
 
     print()
     print("Transition Model")
