@@ -11,6 +11,7 @@ from tag.catalog import CatalogWriter
 from tag.pipeline import Pipeline
 from tag.validation import Validator
 from tag.validation_report import ValidationSeverity
+from tag.layout.graph_builder import LayoutGraphBuilder
 from pathlib import Path
 
 INPUT_FOLDER = "input"
@@ -145,8 +146,9 @@ def analyze(file: str):
     reader = DrawioReader(file)
 
     document = reader.read()
-    builder = TransitionModelBuilder()
-    transition = builder.build(document)
+
+    transition = Pipeline.load(file)
+    graph = LayoutGraphBuilder.build(transition)
 
     print()
     print("Transition Model")
@@ -165,8 +167,9 @@ def analyze(file: str):
     print(f"Cells      : {document.cell_count}")
     print(f"Interfaces : {len(document.interfaces)}")
 
+    print()
+    print(graph.dump())
 
-    
     for page in document.pages:
         nodes = sum(
             CellClassifier.is_node(cell)

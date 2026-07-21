@@ -63,3 +63,31 @@ class LayoutGraph:
 
         self.nodes[source].neighbours.add(target)
         self.nodes[target].neighbours.add(source)
+
+    def dump(self) -> str:
+        """
+        Return a human-readable representation of the layout graph.
+        """
+
+        lines = [
+            "Layout Graph",
+            "============",
+            "",
+            f"Nodes : {self.node_count}",
+            f"Edges : {self.edge_count}",
+            "",
+        ]
+
+        for node in sorted(self.nodes.values(), key=lambda n: n.id):
+            lines.append(node.id)
+
+            if node.neighbours:
+                for neighbour in sorted(node.neighbours):
+                    lines.append(f"    -> {neighbour}")
+            else:
+                lines.append("    (isolated)")
+
+            lines.append("")
+
+        return "\n".join(lines)
+
