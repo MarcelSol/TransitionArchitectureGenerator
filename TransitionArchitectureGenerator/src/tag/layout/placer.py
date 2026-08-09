@@ -45,8 +45,6 @@ class LayoutPlacer:
         if not core_nodes:
             return positions
 
-        # First version: arrange the most complex nodes
-        # evenly around the centre.
         import math
 
         centre_x = 0.0
@@ -54,23 +52,51 @@ class LayoutPlacer:
 
         radius = max(
             self.grid_size,
-            len(core_nodes) * self.grid_size / (2 * math.pi),
+            len(core_nodes) * self.grid_size / (2.0 * math.pi),
         )
 
-        for index, node in enumerate(
-            sorted(core_nodes, key=lambda n: n.id)
-        ):
+        ordered_nodes = sorted(
+            core_nodes,
+            key=lambda node: node.name.lower(),
+        )
+
+        for index, node in enumerate(ordered_nodes):
             angle = (
-                2.0 * math.pi * index / len(core_nodes)
+                2.0
+                * math.pi
+                * index
+                / len(ordered_nodes)
             )
 
-            x = centre_x + radius * math.cos(angle)
-            y = centre_y + radius * math.sin(angle)
-
             positions[node.id] = NodePosition(
-                x=x,
-                y=y,
+                x=centre_x + radius * math.cos(angle),
+                y=centre_y + radius * math.sin(angle),
                 layout_layer=1,
             )
 
         return positions
+
+    def dump(self, graph: LayoutGraph) -> None:
+        """Print the current placement to the console."""
+
+        positions = self.place(graph)
+
+        print()
+        print("Node Placement")
+        print("==============")
+
+        for node_id in sorted(
+            positions,
+            key=lambda node_id: graph.nodes[node_id].name.lower(),
+        ):
+            node = graph.nodes[node_id]
+            position = positions[node_id]
+
+            print(
+                f"{node.name}"
+                f"    Complexity : {node.complexity}"
+                f"    Layer : {position.layout_layer}"
+                f"    x={position.x:.1f}"
+                f"    y={position.y:.1f}"
+            )
+
