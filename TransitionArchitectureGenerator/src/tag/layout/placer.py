@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+import math
 
+from dataclasses import dataclass
 from tag.layout.graph import LayoutGraph
 
 
@@ -8,7 +9,6 @@ class NodePosition:
     x: float
     y: float
     layout_layer: int
-
 
 class LayoutPlacer:
     """Place nodes according to their complexity and graph relationships."""
@@ -31,11 +31,6 @@ class LayoutPlacer:
         if not nodes:
             return positions
 
-        max_complexity = max(
-            node.complexity or 0
-            for node in nodes
-        )
-
         complexities = sorted(
             {
                 node.complexity
@@ -52,18 +47,16 @@ class LayoutPlacer:
                 if node.complexity == complexity
             ]
 
-            if complexity == max_complexity:
+            if not positions:
                 self._place_core(
                     complexity_nodes,
                     positions,
                 )
-                continue
-
-            self._place_outer_nodes(
-                complexity_nodes,
-                positions,
-                complexity,
-            )
+            else:
+                self._place_complexity_level(
+                    complexity_nodes,
+                    positions,
+                )
 
         return positions
 
@@ -74,8 +67,6 @@ class LayoutPlacer:
     ) -> None:
         """Place the most complex nodes in the centre layer."""
 
-        import math
-
         ordered_nodes = sorted(
             nodes,
             key=lambda node: node.name.lower(),
@@ -83,7 +74,9 @@ class LayoutPlacer:
 
         radius = max(
             self.grid_size,
-            len(ordered_nodes) * self.grid_size / (2.0 * math.pi),
+            len(ordered_nodes)
+            * self.grid_size
+            / (2.0 * math.pi),
         )
 
         for index, node in enumerate(ordered_nodes):
@@ -100,71 +93,106 @@ class LayoutPlacer:
                 layout_layer=1,
             )
 
-
-    def _place_outer_nodes(
+    def _place_complexity_level(
         self,
         nodes: list,
         positions: dict[str, NodePosition],
-        complexity: int,
     ) -> None:
-        """Place the next complexity level outside the existing nodes."""
+        """Place a complexity level into the existing or a new layer."""
 
-        import math
-
-        ordered_nodes = sorted(
+        for node in sorted(
             nodes,
             key=lambda node: node.name.lower(),
-        )
-
-        existing_layers = [
-            position.layout_layer
-            for position in positions.values()
-        ]
-
-        outer_layer = max(existing_layers, default=1)
-
-        radius = outer_layer * self.grid_size * 2.0
-
-        angle_offset = (
-            complexity * math.pi / 4.0
-        )
-
-        for index, node in enumerate(ordered_nodes):
-            angle = (
-                angle_offset
-                + 2.0
-                * math.pi
-                * index
-                / len(ordered_nodes)
-            )
-
-            positions[node.id] = NodePosition(
-                x=radius * math.cos(angle),
-                y=radius * math.sin(angle),
-                layout_layer=outer_layer,
-            )
-
-    def dump(self, graph: LayoutGraph) -> None:
-        """Print the current placement to the console."""
-
-        positions = self.place(graph)
-
-        print()
-        print("Node Placement")
-        print("==============")
-
-        for node_id in sorted(
-            positions,
-            key=lambda node_id: graph.nodes[node_id].name.lower(),
         ):
-            node = graph.nodes[node_id]
-            position = positions[node_id]
-
-            print(
-                f"{node.name}"
-                f"    Complexity : {node.complexity}"
-                f"    Layer : {position.layout_layer}"
-                f"    x={position.x:.1f}"
-                f"    y={position.y:.1f}"
+            current_layer = max(
+                position.layout_layer
+                for position in positions.values()
             )
 
+            placed = self._try_place_in_layer(
+                node,
+                current_layer,
+                positions,
+            )
+
+            if not placed:
+                current_layer += 1
+
+                placed = self._try_place_in_layer(
+                    node,
+                    current_layer,
+                    positions,
+                )
+
+            if not placed:
+                raise RuntimeError(
+                    f"Could not place node '{node.name}' "
+                    f"in layout layer {current_layer}"
+                )
+
+    def _try_place_in_layer(
+        self,
+        node,
+        layer: int,
+        positions: dict[str, NodePosition],
+    ) -> bool:
+        """Try to find a free position in the requested layer."""
+
+        radius = layer * self.grid_size * 2.0
+
+        circumference = 2.0 * math.pi * radius
+
+        slot_count = max(
+            1,
+            int(
+                circumference
+                / self.node_spacing
+            ),
+        )
+
+        for slot in range(slot_count):
+            angle = (
+                2.0
+                * math.pi
+                * slot
+                / slot_count
+            )
+
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle)
+
+            if self._position_is_free(
+                x,
+                y,
+                positions,
+            ):
+                positions[node.id] = NodePosition(
+                    x=x,
+                    y=y,
+                    layout_layer=layer,
+                )
+
+                return True
+
+        return False
+
+    def _position_is_free(
+        self,
+        x: float,
+        y: float,
+        positions: dict[str, NodePosition],
+    ) -> bool:
+        """Return True when no existing node is too close."""
+
+        for position in positions.values():
+            dx = x - position.x
+            dy = y - position.y
+
+            distance = math.sqrt(
+                dx * dx + dy * dy
+            )
+
+            if distance < self.node_spacing:
+                return False
+
+        return True

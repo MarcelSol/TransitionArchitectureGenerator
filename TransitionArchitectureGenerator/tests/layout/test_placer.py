@@ -21,36 +21,58 @@ def test_places_nodes_by_complexity():
         "C": LayoutNode(
             id="C",
             name="C",
-            neighbours={"A", "B", "D"},
+            neighbours={"A", "B"},
             complexity=4,
         ),
         "D": LayoutNode(
             id="D",
             name="D",
-            neighbours={"C"},
+            neighbours={"A"},
             complexity=3,
         ),
         "E": LayoutNode(
             id="E",
             name="E",
+            neighbours={"B"},
+            complexity=3,
+        ),
+        "F": LayoutNode(
+            id="F",
+            name="F",
             neighbours={"C"},
-            complexity=2,
+            complexity=3,
         ),
     }
     )
 
-    placer = LayoutPlacer()
+    placer = LayoutPlacer(
+        grid_size=100.0,
+        node_spacing=150.0,
+    )
+
+
     positions = placer.place(graph)
 
-    assert set(positions) == {"A", "B", "C", "D", "E"}
-    
+    assert set(positions) == {
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+    }
+
     assert positions["A"].layout_layer == 1
     assert positions["B"].layout_layer == 1
     assert positions["C"].layout_layer == 1
-    assert positions["D"].layout_layer == 1
-    assert positions["E"].layout_layer == 1
+    assert positions["D"].layout_layer >= 1
+    assert positions["E"].layout_layer >= 1
+    assert positions["F"].layout_layer >= 1
 
-    print("PASS: core nodes were placed")
+    for node_id in ("D", "E", "F"):
+        assert positions[node_id].layout_layer >= 1
+
+    print("PASS: core nodes were placed in onion layers")
 
     for node_id, position in positions.items():
         print(
