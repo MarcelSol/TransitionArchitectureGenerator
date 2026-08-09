@@ -13,6 +13,7 @@ from tag.validation import Validator
 from tag.validation_report import ValidationSeverity
 from tag.layout.graph_builder import LayoutGraphBuilder
 from tag.layout.graph_peeler import GraphPeeler
+from tag.layout.placer import LayoutPlacer
 from pathlib import Path
 
 INPUT_FOLDER = "input"
@@ -153,6 +154,9 @@ def analyze(file: str):
 
     GraphPeeler.peel(graph)
 
+    placer = LayoutPlacer()
+    positions = placer.place(graph)
+
     print()
     print("Transition Model")
     print("----------------")
@@ -197,6 +201,25 @@ def analyze(file: str):
 
     print()
     print(graph.dump())
+
+    print()
+    print("Node Placement")
+    print("==============")
+
+    for node_id in sorted(
+        positions,
+        key=lambda node_id: graph.nodes[node_id].name.lower(),
+    ):
+        node = graph.nodes[node_id]
+        position = positions[node_id]
+
+        print(
+            f"{node.name}"
+            f"    Complexity : {node.complexity}"
+            f"    Layer : {position.layout_layer}"
+            f"    x={position.x:.1f}"
+            f"    y={position.y:.1f}"
+        )
 
 @app.command()
 def version():
