@@ -36,28 +36,54 @@ class LayoutPlacer:
             for node in nodes
         )
 
-        core_nodes = [
-            node
-            for node in nodes
-            if node.complexity == max_complexity
-        ]
+        complexities = sorted(
+            {
+                node.complexity
+                for node in nodes
+                if node.complexity is not None
+            },
+            reverse=True,
+        )
 
-        if not core_nodes:
-            return positions
+        for complexity in complexities:
+            complexity_nodes = [
+                node
+                for node in nodes
+                if node.complexity == complexity
+            ]
+
+            if complexity == max_complexity:
+                self._place_core(
+                    complexity_nodes,
+                    positions,
+                )
+                continue
+
+            self._place_outer_nodes(
+                complexity_nodes,
+                positions,
+                complexity,
+            )
+
+        return positions
+
+    def _place_core(
+        self,
+        nodes: list,
+        positions: dict[str, NodePosition],
+    ) -> None:
+        """Place the most complex nodes in the centre layer."""
 
         import math
 
-        centre_x = 0.0
-        centre_y = 0.0
+        ordered_nodes = sorted(
+            nodes,
+            key=lambda node: node.name.lower(),
+        )
 
         radius = max(
             self.grid_size,
-            len(core_nodes) * self.grid_size / (2.0 * math.pi),
-        )
-
-        ordered_nodes = sorted(
-            core_nodes,
-            key=lambda node: node.name.lower(),
+            len(ordered_nodes) * self.grid_size / (2.0 * math.pi),
         )
 
         for index, node in enumerate(ordered_nodes):
@@ -69,12 +95,54 @@ class LayoutPlacer:
             )
 
             positions[node.id] = NodePosition(
-                x=centre_x + radius * math.cos(angle),
-                y=centre_y + radius * math.sin(angle),
+                x=radius * math.cos(angle),
+                y=radius * math.sin(angle),
                 layout_layer=1,
             )
 
-        return positions
+
+    def _place_outer_nodes(
+        self,
+        nodes: list,
+        positions: dict[str, NodePosition],
+        complexity: int,
+    ) -> None:
+        """Place the next complexity level outside the existing nodes."""
+
+        import math
+
+        ordered_nodes = sorted(
+            nodes,
+            key=lambda node: node.name.lower(),
+        )
+
+        existing_layers = [
+            position.layout_layer
+            for position in positions.values()
+        ]
+
+        outer_layer = max(existing_layers, default=1)
+
+        radius = outer_layer * self.grid_size * 2.0
+
+        angle_offset = (
+            complexity * math.pi / 4.0
+        )
+
+        for index, node in enumerate(ordered_nodes):
+            angle = (
+                angle_offset
+                + 2.0
+                * math.pi
+                * index
+                / len(ordered_nodes)
+            )
+
+            positions[node.id] = NodePosition(
+                x=radius * math.cos(angle),
+                y=radius * math.sin(angle),
+                layout_layer=outer_layer,
+            )
 
     def dump(self, graph: LayoutGraph) -> None:
         """Print the current placement to the console."""
