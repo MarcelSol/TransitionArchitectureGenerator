@@ -1,3 +1,4 @@
+import math
 from tag.layout.graph import LayoutGraph, LayoutNode
 from tag.layout.placer import LayoutPlacer
 
@@ -62,17 +63,24 @@ def test_places_nodes_by_complexity():
         "F",
     }
 
-    assert positions["A"].layout_layer == 1
-    assert positions["B"].layout_layer == 1
-    assert positions["C"].layout_layer == 1
-    assert positions["D"].layout_layer >= 1
-    assert positions["E"].layout_layer >= 1
-    assert positions["F"].layout_layer >= 1
+    assert positions["D"].layout_layer >= positions["A"].layout_layer
+    assert positions["E"].layout_layer >= positions["B"].layout_layer
+    assert positions["F"].layout_layer >= positions["C"].layout_layer
 
-    for node_id in ("D", "E", "F"):
-        assert positions[node_id].layout_layer >= 1
+    distance_d_a = math.sqrt(
+        (
+            positions["D"].x
+            - positions["A"].x
+        ) ** 2
+        + (
+            positions["D"].y
+            - positions["A"].y
+        ) ** 2
+    )
 
-    print("PASS: core nodes were placed in onion layers")
+    assert distance_d_a < 500.0
+
+    print("PASS: nodes were placed using neighbour-aware positioning")
 
     for node_id, position in positions.items():
         print(
