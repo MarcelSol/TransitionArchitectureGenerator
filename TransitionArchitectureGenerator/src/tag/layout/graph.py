@@ -4,7 +4,6 @@ Graph representation used by the TAG layout engine.
 
 from dataclasses import dataclass, field
 
-
 @dataclass(slots=True)
 class LayoutNode:
     """
