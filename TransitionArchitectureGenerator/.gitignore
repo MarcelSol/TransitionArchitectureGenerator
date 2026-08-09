@@ -13,4 +13,6 @@ output/*
 input/*
 !input/.gitkeep
 
+src/tag/result.txt
+
 *.log

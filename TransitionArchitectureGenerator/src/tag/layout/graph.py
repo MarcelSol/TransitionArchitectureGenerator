@@ -161,19 +161,10 @@ class LayoutGraph:
             if not nodes:
                 continue
 
-            lines.append("-" * 60)
-            lines.append(
-                f"Complexity {complexity} ({len(nodes)})"
-            )
-            lines.append("-" * 60)
-            lines.append("")
-
             for node in nodes:
 
-                lines.append(node.name)
-
                 lines.append(
-                    f"    Level      : {node.level}"
+                    f"\t{node.level}\t{node.name}"
                 )
 
                 if node.neighbours:
@@ -185,12 +176,10 @@ class LayoutGraph:
                         )
 
                         lines.append(
-                            f"    -> {neighbour_name}"
+                            f"\t\t\t{neighbour_name}"
                         )
 
                 else:
-                    lines.append("    (isolated)")
-
-                lines.append("")
+                    lines.append("\t\t\t(isolated)")
 
         return "\n".join(lines)

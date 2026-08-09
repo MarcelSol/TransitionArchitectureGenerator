@@ -170,9 +170,6 @@ def analyze(file: str):
     print(f"Cells      : {document.cell_count}")
     print(f"Interfaces : {len(document.interfaces)}")
 
-    print()
-    print(graph.dump())
-
     for page in document.pages:
         nodes = sum(
             CellClassifier.is_node(cell)
@@ -197,6 +194,9 @@ def analyze(file: str):
         print(f"Interfaces  : {interfaces}")
         print(f"Groups      : {groups}")
 
+
+    print()
+    print(graph.dump())
 
 @app.command()
 def version():
