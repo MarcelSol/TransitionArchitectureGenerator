@@ -4,6 +4,7 @@ Graph representation used by the TAG layout engine.
 
 from dataclasses import dataclass, field
 
+
 @dataclass(slots=True)
 class LayoutNode:
     """
@@ -42,6 +43,15 @@ class LayoutNode:
     #
     peel_round: int | None = None
 
+    #
+    # Footprint of the node on the integer layout grid.
+    #
+    # A normal node occupies one cell.
+    # Composite nodes may occupy multiple cells.
+    #
+    width: int = 1
+    height: int = 1
+
     @property
     def level(self) -> str | None:
         """
@@ -60,6 +70,7 @@ class LayoutNode:
 
         return f"{self.complexity}.{self.peel_round + 1}"
 
+
 @dataclass(slots=True)
 class LayoutGraph:
     """
@@ -74,17 +85,16 @@ class LayoutGraph:
 
     @property
     def edge_count(self) -> int:
-
         return (
             sum(
                 len(node.neighbours)
                 for node in self.nodes.values()
-            ) // 2
+            )
+            // 2
         )
 
     @property
     def max_complexity(self) -> int:
-
         complexities = [
             node.complexity
             for node in self.nodes.values()
@@ -97,7 +107,6 @@ class LayoutGraph:
         return max(complexities)
 
     def __str__(self) -> str:
-
         return (
             f"LayoutGraph("
             f"nodes={self.node_count}, "
@@ -152,7 +161,9 @@ class LayoutGraph:
                     if node.complexity == complexity
                 ),
                 key=lambda node: (
-                    node.peel_round if node.peel_round is not None else -1,
+                    node.peel_round
+                    if node.peel_round is not None
+                    else -1,
                     node.name.casefold(),
                 ),
             )
