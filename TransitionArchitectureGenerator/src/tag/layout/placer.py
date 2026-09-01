@@ -148,10 +148,6 @@ class LayoutPlacer:
     ) -> NodePosition | None:
         """Find the best available position for a node."""
 
-        candidates = self._generate_candidates(
-            layer,
-        )
-
         placed_neighbours = [
             positions[neighbour_id]
             for neighbour_id in node.neighbours
@@ -159,15 +155,26 @@ class LayoutPlacer:
         ]
 
         if not placed_neighbours:
-            for candidate in candidates:
-                if self._position_is_free(
-                    candidate.x,
-                    candidate.y,
-                    positions,
-                ):
-                    return candidate
+            return self._find_free_ring_position(
+                layer,
+                positions,
+            )
 
-            return None
+        preferred_x = sum(
+            position.x
+            for position in placed_neighbours
+        ) / len(placed_neighbours)
+
+        preferred_y = sum(
+            position.y
+            for position in placed_neighbours
+        ) / len(placed_neighbours)
+
+        candidates = self._generate_neighbour_candidates(
+            preferred_x,
+            preferred_y,
+            layer,
+        )
 
         best_candidate = None
         best_score = float("inf")
@@ -191,11 +198,63 @@ class LayoutPlacer:
 
         return best_candidate
 
-    def _generate_candidates(
+    def _generate_neighbour_candidates(
         self,
+        preferred_x: float,
+        preferred_y: float,
         layer: int,
     ) -> list[NodePosition]:
-        """Generate possible positions around a layout layer."""
+        """Generate candidate positions around the preferred location."""
+
+        candidates = []
+
+        search_radius = self.node_spacing * 1.5
+
+        for ring in range(4):
+            radius = ring * search_radius / 3.0
+
+            if ring == 0:
+                candidates.append(
+                    NodePosition(
+                        x=preferred_x,
+                        y=preferred_y,
+                        layout_layer=layer,
+                    )
+                )
+                continue
+
+            slot_count = 8 * ring
+
+            for slot in range(slot_count):
+                angle = (
+                    2.0
+                    * math.pi
+                    * slot
+                    / slot_count
+                )
+
+                candidates.append(
+                    NodePosition(
+                        x=(
+                            preferred_x
+                            + radius * math.cos(angle)
+                        ),
+                        y=(
+                            preferred_y
+                            + radius * math.sin(angle)
+                        ),
+                        layout_layer=layer,
+                    )
+                )
+
+        return candidates
+
+    def _find_free_ring_position(
+        self,
+        layer: int,
+        positions: dict[str, NodePosition],
+    ) -> NodePosition | None:
+        """Find a free position on the requested onion layer."""
 
         radius = layer * self.grid_size * 2.0
 
@@ -203,65 +262,6 @@ class LayoutPlacer:
 
         slot_count = max(
             8,
-            int(
-                circumference
-                / self.node_spacing
-            ),
-        )
-
-        candidates = []
-
-        for slot in range(slot_count):
-            angle = (
-                2.0
-                * math.pi
-                * slot
-                / slot_count
-            )
-
-            candidates.append(
-                NodePosition(
-                    x=radius * math.cos(angle),
-                    y=radius * math.sin(angle),
-                    layout_layer=layer,
-                )
-            )
-
-        return candidates
-
-    def _distance_to_neighbours(
-        self,
-        candidate: NodePosition,
-        neighbours: list[NodePosition],
-    ) -> float:
-        """Calculate the total distance to a node's neighbours."""
-
-        total_distance = 0.0
-
-        for neighbour in neighbours:
-            dx = candidate.x - neighbour.x
-            dy = candidate.y - neighbour.y
-
-            total_distance += math.sqrt(
-                dx * dx + dy * dy
-            )
-
-        return total_distance
-
-    def _try_place_in_layer(
-        self,
-        node,
-        layer: int,
-        positions: dict[str, NodePosition],
-    ) -> bool:
-        """Try to find a free position in the requested layer."""
-
-        radius = layer * self.grid_size * 2.0
-
-        circumference = 2.0 * math.pi * radius
-
-        slot_count = max(
-            1,
             int(
                 circumference
                 / self.node_spacing
@@ -284,15 +284,32 @@ class LayoutPlacer:
                 y,
                 positions,
             ):
-                positions[node.id] = NodePosition(
+                return NodePosition(
                     x=x,
                     y=y,
                     layout_layer=layer,
                 )
 
-                return True
+        return None
 
-        return False
+    def _distance_to_neighbours(
+        self,
+        candidate: NodePosition,
+        neighbours: list[NodePosition],
+    ) -> float:
+        """Calculate the total distance to a node's neighbours."""
+
+        total_distance = 0.0
+
+        for neighbour in neighbours:
+            dx = candidate.x - neighbour.x
+            dy = candidate.y - neighbour.y
+
+            total_distance += math.sqrt(
+                dx * dx + dy * dy
+            )
+
+        return total_distance
 
     def _position_is_free(
         self,

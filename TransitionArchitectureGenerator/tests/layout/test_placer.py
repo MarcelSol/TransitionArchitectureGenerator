@@ -28,19 +28,19 @@ def test_places_nodes_by_complexity():
         "D": LayoutNode(
             id="D",
             name="D",
-            neighbours={"A"},
+            neighbours={"A", "B"},
             complexity=3,
         ),
         "E": LayoutNode(
             id="E",
             name="E",
-            neighbours={"B"},
+            neighbours={"B", "C"},
             complexity=3,
         ),
         "F": LayoutNode(
             id="F",
             name="F",
-            neighbours={"C"},
+            neighbours={"A", "C"},
             complexity=3,
         ),
     }
@@ -79,6 +79,20 @@ def test_places_nodes_by_complexity():
     )
 
     assert distance_d_a < 500.0
+    assert positions["D"].layout_layer >= max(
+        positions["A"].layout_layer,
+        positions["B"].layout_layer,
+    )
+
+    assert positions["E"].layout_layer >= max(
+        positions["B"].layout_layer,
+        positions["C"].layout_layer,
+    )
+
+    assert positions["F"].layout_layer >= max(
+        positions["A"].layout_layer,
+        positions["C"].layout_layer,
+    )
 
     print("PASS: nodes were placed using neighbour-aware positioning")
 
