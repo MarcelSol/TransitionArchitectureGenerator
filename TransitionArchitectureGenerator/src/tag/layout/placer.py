@@ -14,8 +14,8 @@ class NodePosition:
 
     x and y identify the top-left cell occupied by the node.
 
-    layout_layer is the minimum onion layer touched by the node's
-    complete footprint.
+    layout_layer is the minimum onion layer touched by the
+    complete node footprint.
     """
 
     x: int
@@ -25,25 +25,54 @@ class NodePosition:
 
 class LayoutPlacer:
     """
-    Place nodes on an integer rectangular onion grid.
+    Place nodes on a rectangular onion grid.
 
-    The most complex nodes are placed first in the centre.
-    Lower-complexity nodes are placed progressively outward.
+    The default core is 4 x 3.
 
-    Connectivity determines the preferred position within the
-    permitted area. Complexity determines the minimum permitted
-    onion layer.
+    Each new layer adds four rows in total:
+    two rows at the top and two rows at the bottom.
+
+    The width is calculated to keep the layer as close as possible
+    to a 4:3 aspect ratio.
+
+    For layer i:
+
+        height = 4 * (i - 1) + 3
+        width  = round(4 * height / 3)
     """
 
     def __init__(
         self,
+        core_width: int = 4,
+        core_height: int = 3,
+        layer_height_expansion: int = 4,
+        target_aspect_ratio: float = 4 / 3,
         grid_size: float = 200.0,
         node_spacing: float = 80.0,
     ) -> None:
+        if core_width < 1:
+            raise ValueError("core_width must be at least 1")
+
+        if core_height < 1:
+            raise ValueError("core_height must be at least 1")
+
+        if layer_height_expansion < 1:
+            raise ValueError(
+                "layer_height_expansion must be at least 1"
+            )
+
+        if target_aspect_ratio <= 0:
+            raise ValueError(
+                "target_aspect_ratio must be positive"
+            )
+
+        self.core_width = core_width
+        self.core_height = core_height
+        self.layer_height_expansion = layer_height_expansion
+        self.target_aspect_ratio = target_aspect_ratio
+
         # Kept for compatibility with the existing CLI and callers.
-        #
-        # These values are no longer used to determine the logical
-        # position. Rendering to Draw.io coordinates is a later step.
+        # These values belong to the later Draw.io rendering stage.
         self.grid_size = grid_size
         self.node_spacing = node_spacing
 
@@ -103,7 +132,8 @@ class LayoutPlacer:
                 if position is None:
                     raise RuntimeError(
                         f"Could not place node '{node.name}' "
-                        f"with minimum layout layer {minimum_layer}"
+                        f"with minimum layout layer "
+                        f"{minimum_layer}"
                     )
 
                 positions[node.id] = position
@@ -127,12 +157,11 @@ class LayoutPlacer:
         Find the best available integer-grid position.
 
         Already-placed neighbours determine the preferred location.
-        The search then examines progressively larger Manhattan
-        distances around that location.
 
-        A candidate is valid only if:
-        - the complete node footprint is unoccupied
-        - the footprint's minimum layer is >= minimum_layer
+        The search expands outward until it finds a position where:
+
+        - the complete footprint is free
+        - the node's minimum touched layer is permitted
         """
 
         placed_neighbours = [
@@ -142,6 +171,7 @@ class LayoutPlacer:
         ]
 
         if placed_neighbours:
+
             preferred_x = round(
                 sum(
                     position.x
@@ -157,13 +187,19 @@ class LayoutPlacer:
                 )
                 / len(placed_neighbours)
             )
+
         else:
             preferred_x = 0
             preferred_y = 0
 
+        max_layer = max(
+            minimum_layer,
+            self._max_layer(positions),
+        )
+
         search_radius = max(
             2,
-            self._max_layer(positions)
+            max_layer * self.layer_height_expansion
             + node.width
             + node.height,
         )
@@ -189,9 +225,9 @@ class LayoutPlacer:
             for x, y in candidates:
 
                 layer = self._node_layer(
-                    node,
-                    x,
-                    y,
+                    node=node,
+                    x=x,
+                    y=y,
                 )
 
                 if layer < minimum_layer:
@@ -237,6 +273,7 @@ class LayoutPlacer:
                 dy = distance - abs(dx)
 
                 if dy == 0:
+
                     candidates.append(
                         (
                             preferred_x + dx,
@@ -245,6 +282,7 @@ class LayoutPlacer:
                     )
 
                 else:
+
                     candidates.append(
                         (
                             preferred_x + dx,
@@ -272,26 +310,30 @@ class LayoutPlacer:
         """
         Score a candidate position.
 
-        The primary objective is to keep connected nodes close together.
+        Connected nodes are preferred to be close together.
 
-        The next objective is to use the innermost permitted layer.
+        Among otherwise similar candidates, the innermost permitted
+        layer is preferred.
 
-        The final terms make placement deterministic.
+        The remaining terms provide deterministic tie-breaking.
         """
 
         if neighbours:
+
             distance = sum(
                 abs(x - neighbour.x)
                 + abs(y - neighbour.y)
                 for neighbour in neighbours
             )
+
         else:
+
             distance = abs(x) + abs(y)
 
         layer = self._node_layer(
-            node,
-            x,
-            y,
+            node=node,
+            x=x,
+            y=y,
         )
 
         if layer < minimum_layer:
@@ -319,9 +361,9 @@ class LayoutPlacer:
         """
 
         occupied = self._occupied_cells(
-            node,
-            x,
-            y,
+            node=node,
+            x=x,
+            y=y,
         )
 
         for other_id, position in positions.items():
@@ -329,9 +371,9 @@ class LayoutPlacer:
             other_node = graph.nodes[other_id]
 
             other_occupied = self._occupied_cells(
-                other_node,
-                position.x,
-                position.y,
+                node=other_node,
+                x=position.x,
+                y=position.y,
             )
 
             if occupied.intersection(other_occupied):
@@ -346,11 +388,11 @@ class LayoutPlacer:
         y: int,
     ) -> set[tuple[int, int]]:
         """
-        Return every grid cell occupied by a node.
+        Return every logical grid cell occupied by a node.
 
         x/y represent the top-left cell.
 
-        Therefore a node with width=3 and height=2 at (-2, 3)
+        A node with width=3 and height=2 at (-2, 3)
         occupies:
 
             (-2, 3) (-1, 3) (0, 3)
@@ -371,17 +413,12 @@ class LayoutPlacer:
     ) -> int:
         """
         Return the minimum onion layer touched by the node footprint.
-
-        A composite node may therefore span several layers.
-
-        For example, if one part of a node touches layer 3 and another
-        part touches layer 5, the node's layout layer is 3.
         """
 
         cells = self._occupied_cells(
-            node,
-            x,
-            y,
+            node=node,
+            x=x,
+            y=y,
         )
 
         return min(
@@ -398,18 +435,116 @@ class LayoutPlacer:
         y: int,
     ) -> int:
         """
-        Return the rectangular onion layer containing one grid cell.
+        Return the rectangular onion layer containing a grid cell.
 
-        The central cell (0, 0) is layer 1.
+        Layer dimensions are calculated from the configured core
+        dimensions and target aspect ratio.
 
-        Each additional layer expands the rectangle by one cell
-        on every side.
+        The first layer is the configured core.
+        Each subsequent layer grows outward.
         """
 
-        return max(
-            abs(x),
-            abs(y),
-        ) + 1
+        for layer in range(1, 1001):
+
+            width = self._layer_width(layer)
+            height = self._layer_height(layer)
+
+            if self._cell_is_inside_layer(
+                x=x,
+                y=y,
+                width=width,
+                height=height,
+            ):
+                return layer
+
+        raise RuntimeError(
+            f"Grid coordinate ({x}, {y}) exceeds the "
+            "supported layout layer range"
+        )
+
+    def _cell_is_inside_layer(
+        self,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+    ) -> bool:
+        """
+        Return True when a cell lies inside a layer rectangle.
+
+        The rectangle is centred as evenly as possible around (0, 0).
+
+        For an even dimension, the extra cell is consistently placed
+        on the positive side.
+        """
+
+        min_x = -(width // 2)
+        max_x = min_x + width - 1
+
+        min_y = -(height // 2)
+        max_y = min_y + height - 1
+
+        return (
+            min_x <= x <= max_x
+            and min_y <= y <= max_y
+        )
+
+    def _layer_width(
+        self,
+        layer: int,
+    ) -> int:
+        """
+        Return the width of the specified layer.
+
+        The default target ratio is 4:3.
+
+        Examples:
+
+            Layer 1: 4
+            Layer 2: 9
+            Layer 3: 15
+            Layer 4: 20
+            Layer 5: 25
+        """
+
+        height = self._layer_height(layer)
+
+        return self._round_half_up(
+            self.target_aspect_ratio * height
+        )
+
+    def _layer_height(
+        self,
+        layer: int,
+    ) -> int:
+        """
+        Return the height of the specified layer.
+
+        With the default configuration:
+
+            Layer 1: 3
+            Layer 2: 7
+            Layer 3: 11
+            Layer 4: 15
+            Layer 5: 19
+        """
+
+        return (
+            self.core_height
+            + (layer - 1)
+            * self.layer_height_expansion
+        )
+
+    @staticmethod
+    def _round_half_up(
+        value: float,
+    ) -> int:
+        """
+        Round a positive value using conventional mathematical
+        half-up rounding.
+        """
+
+        return int(value + 0.5)
 
     def _max_layer(
         self,
