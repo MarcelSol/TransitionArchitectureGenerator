@@ -2,9 +2,11 @@
 excel_exporter.py
 
 Exports a TransitionModel to an Excel workbook.
-"""
 
-from __future__ import annotations
+The workbook contains the complete model data required for a future
+Excel -> TransitionModel import, while deliberately excluding layout
+and optimization data.
+"""
 
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -12,13 +14,15 @@ from openpyxl.styles import Font
 from tag.builder import TransitionModelBuilder
 from tag.transition_model import (
     TransitionModel,
-    NodeCategory,
     InterfaceDirection,
     TransferType,
 )
 
 from tag.validation import Validator
-from tag.validation_report import ValidationSeverity
+from tag.validation_report import (
+    ValidationReport,
+    ValidationSeverity,
+)
 
 
 class ExcelExporter:
@@ -30,12 +34,32 @@ class ExcelExporter:
     ) -> None:
 
         workbook = Workbook()
-        report = Validator.validate(model)
+
+        report = Validator.validate(
+            model
+        )
 
         #
-        # Remove the default worksheet created by openpyxl.
+        # Remove the default worksheet created
+        # by openpyxl.
         #
-        workbook.remove(workbook.active)
+        workbook.remove(
+            workbook.active
+        )
+
+        #
+        # Summary is intentionally first because
+        # it is the human-readable overview.
+        #
+        ExcelExporter._write_summary(
+            workbook,
+            model,
+        )
+
+        ExcelExporter._write_milestones(
+            workbook,
+            model,
+        )
 
         ExcelExporter._write_nodes(
             workbook,
@@ -47,7 +71,7 @@ class ExcelExporter:
             model,
         )
 
-        ExcelExporter._write_summary(
+        ExcelExporter._write_children(
             workbook,
             model,
         )
@@ -57,193 +81,13 @@ class ExcelExporter:
             report,
         )
 
-        workbook.save(filename)
+        workbook.save(
+            filename
+        )
 
-    # ---------------------------------------------------------------------
-
-    @staticmethod
-    def _write_nodes(
-        workbook: Workbook,
-        model: TransitionModel,
-    ) -> None:
-
-        sheet = workbook.create_sheet("Nodes")
-
-        milestones = model.milestones
-
-        headers = [
-            "ID",
-            "Name",
-            "Category",
-            "First Appears",
-            "Disappears",
-        ] + milestones
-
-        sheet.append(headers)
-
-        ExcelExporter._format_header(sheet)
-
-        final_milestone = milestones[-1]
-
-        for node in sorted(
-            model.nodes.values(),
-            key=lambda n: n.name.lower(),
-        ):
-
-            first = TransitionModelBuilder._first_visible(
-                node.visible_on,
-                milestones,
-            )
-
-            retired = TransitionModelBuilder._retired_in(
-                node.visible_on,
-                milestones,
-            )
-
-            if retired == final_milestone:
-                retired = ""
-
-            row = [
-                node.id,
-                node.name,
-                node.category.value,
-                first,
-                retired,
-            ]
-
-            for milestone in milestones:
-                row.append(
-                    "X"
-                    if milestone in node.visible_on
-                    else ""
-                )
-
-            sheet.append(row)
-
-        ExcelExporter._auto_width(sheet)
-
-    # ---------------------------------------------------------------------
-
-    @staticmethod
-    def _format_header(sheet):
-
-        bold = Font(bold=True)
-
-        for cell in sheet[1]:
-            cell.font = bold
-
-        sheet.freeze_panes = "A2"
-
-    # ---------------------------------------------------------------------
-
-    @staticmethod
-    def _auto_width(sheet):
-
-        for column in sheet.columns:
-
-            length = max(
-                len(str(cell.value))
-                if cell.value is not None
-                else 0
-                for cell in column
-            )
-
-            sheet.column_dimensions[
-                column[0].column_letter
-            ].width = length + 2
-
-    # ---------------------------------------------------------------------
-
-    @staticmethod
-    def _write_interfaces(
-        workbook: Workbook,
-        model: TransitionModel,
-    ) -> None:
-
-        sheet = workbook.create_sheet("Interfaces")
-
-        milestones = model.milestones
-
-        headers = [
-            "ID",
-            "Source",
-            "Target",
-            "Transfer",
-            "Direction",
-            "First Appears",
-            "Disappears",
-        ] + milestones
-
-        sheet.append(headers)
-
-        ExcelExporter._format_header(sheet)
-
-        final_milestone = milestones[-1]
-
-        node_lookup = {
-            node.id: node
-            for node in model.nodes.values()
-        }
-
-        for interface in sorted(
-            model.interfaces.values(),
-            key=lambda i: (
-                node_lookup[i.source].name.lower(),
-                node_lookup[i.target].name.lower(),
-            ),
-        ):
-
-            first = TransitionModelBuilder._first_visible(
-                interface.visible_on,
-                milestones,
-            )
-
-            last = TransitionModelBuilder._last_visible(
-                interface.visible_on,
-                milestones,
-            )
-
-            if last == final_milestone:
-                last = ""
-
-            source = node_lookup[interface.source].name
-            target = node_lookup[interface.target].name
-
-            transfer = (
-                "Manual"
-                if interface.transfer_type == TransferType.MANUAL
-                else "Automatic"
-            )
-
-            direction = (
-                "Two-way"
-                if interface.direction == InterfaceDirection.TWO_WAY
-                else "One-way"
-            )
-
-            row = [
-                interface.id,
-                source,
-                target,
-                transfer,
-                direction,
-                first,
-                last,
-            ]
-
-            for milestone in milestones:
-
-                row.append(
-                    "X"
-                    if milestone in interface.visible_on
-                    else ""
-                )
-
-            sheet.append(row)
-
-        ExcelExporter._auto_width(sheet)
-
-    # ---------------------------------------------------------------------
+    # -----------------------------------------------------------------
+    # Summary
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _write_summary(
@@ -251,25 +95,99 @@ class ExcelExporter:
         model: TransitionModel,
     ) -> None:
 
-        sheet = workbook.create_sheet("Summary")
+        sheet = workbook.create_sheet(
+            "Summary"
+        )
 
-        headers = [
-            "Milestone",
-            "New Nodes",
-            "Retired Nodes",
-            "Active Nodes",
-            "New Interfaces",
-            "Retired Interfaces",
-            "Active Interfaces",
-        ]
+        #
+        # Title
+        #
+        sheet.append(
+            ["Transition Architecture Model"]
+        )
 
-        sheet.append(headers)
+        sheet["A1"].font = Font(
+            bold=True,
+            size=14,
+        )
 
-        ExcelExporter._format_header(sheet)
+        sheet.append([])
+
+        #
+        # General model information
+        #
+        sheet.append(
+            [
+                "Model element",
+                "Count",
+            ]
+        )
+
+        ExcelExporter._format_header(
+            sheet,
+            row=3,
+        )
+
+        sheet.append(
+            [
+                "Milestones",
+                len(model.milestones),
+            ]
+        )
+
+        sheet.append(
+            [
+                "Nodes",
+                len(model.nodes),
+            ]
+        )
+
+        sheet.append(
+            [
+                "Interfaces",
+                len(model.interfaces),
+            ]
+        )
+
+        child_count = sum(
+            len(node.children)
+            for node in model.nodes.values()
+        )
+
+        sheet.append(
+            [
+                "Children",
+                child_count,
+            ]
+        )
+
+        sheet.append([])
+
+        #
+        # Milestone summary
+        #
+        sheet.append(
+            [
+                "Milestone",
+                "Active Nodes",
+                "New Nodes",
+                "Retired Nodes",
+                "Active Interfaces",
+                "New Interfaces",
+                "Retired Interfaces",
+            ]
+        )
+
+        milestone_header_row = (
+            sheet.max_row
+        )
+
+        ExcelExporter._format_header(
+            sheet,
+            row=milestone_header_row,
+        )
 
         milestones = model.milestones
-
-        final_milestone = milestones[-1]
 
         for milestone in milestones:
 
@@ -279,23 +197,19 @@ class ExcelExporter:
 
             for node in model.nodes.values():
 
-                first = TransitionModelBuilder._first_visible(
-                    node.visible_on,
-                    milestones,
-                )
-
-                retired = TransitionModelBuilder._retired_in(
-                    node.visible_on,
-                    milestones,
-                )
-
                 if milestone in node.visible_on:
                     active_nodes += 1
 
-                if first == milestone:
+                if (
+                    node.first_appears
+                    == milestone
+                ):
                     new_nodes += 1
 
-                if retired == milestone:
+                if (
+                    node.retired_in
+                    == milestone
+                ):
                     retired_nodes += 1
 
             new_interfaces = 0
@@ -304,43 +218,400 @@ class ExcelExporter:
 
             for interface in model.interfaces.values():
 
-                first = TransitionModelBuilder._first_visible(
-                    interface.visible_on,
-                    milestones,
-                )
-
-                last = TransitionModelBuilder._last_visible(
-                    interface.visible_on,
-                    milestones,
-                )
-
                 if milestone in interface.visible_on:
                     active_interfaces += 1
 
-                if first == milestone:
+                if (
+                    interface.first_appears
+                    == milestone
+                ):
                     new_interfaces += 1
 
                 if (
-                    last == milestone
-                    and milestone != final_milestone
+                    interface.retired_in
+                    == milestone
                 ):
                     retired_interfaces += 1
 
             sheet.append(
                 [
                     milestone,
+                    active_nodes,
                     new_nodes,
                     retired_nodes,
-                    active_nodes,
+                    active_interfaces,
                     new_interfaces,
                     retired_interfaces,
-                    active_interfaces,
                 ]
             )
 
-        ExcelExporter._auto_width(sheet)
+        ExcelExporter._auto_width(
+            sheet
+        )
 
-    # ---------------------------------------------------------------------
+    # -----------------------------------------------------------------
+    # Milestones
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _write_milestones(
+        workbook: Workbook,
+        model: TransitionModel,
+    ) -> None:
+
+        sheet = workbook.create_sheet(
+            "Milestones"
+        )
+
+        sheet.append(
+            [
+                "Order",
+                "Milestone",
+            ]
+        )
+
+        ExcelExporter._format_header(
+            sheet
+        )
+
+        for order, milestone in enumerate(
+            model.milestones,
+            start=1,
+        ):
+
+            sheet.append(
+                [
+                    order,
+                    milestone,
+                ]
+            )
+
+        ExcelExporter._auto_width(
+            sheet
+        )
+
+    # -----------------------------------------------------------------
+    # Nodes
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _write_nodes(
+        workbook: Workbook,
+        model: TransitionModel,
+    ) -> None:
+
+        sheet = workbook.create_sheet(
+            "Nodes"
+        )
+
+        headers = [
+            "ID",
+            "Name",
+            "Category",
+            "Width",
+            "Height",
+            "First Appears",
+            "Retired In",
+            "Visible On",
+        ]
+
+        sheet.append(
+            headers
+        )
+
+        ExcelExporter._format_header(
+            sheet
+        )
+
+        for node in sorted(
+            model.nodes.values(),
+            key=lambda n: (
+                n.name.lower(),
+                n.id.lower(),
+            ),
+        ):
+
+            visible_on = (
+                ";".join(
+                    milestone
+                    for milestone
+                    in model.milestones
+                    if milestone
+                    in node.visible_on
+                )
+            )
+
+            sheet.append(
+                [
+                    node.id,
+                    node.name,
+                    node.category.value,
+                    node.width,
+                    node.height,
+                    node.first_appears,
+                    node.retired_in,
+                    visible_on,
+                ]
+            )
+
+        ExcelExporter._auto_width(
+            sheet
+        )
+
+    # -----------------------------------------------------------------
+    # Interfaces
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _write_interfaces(
+        workbook: Workbook,
+        model: TransitionModel,
+    ) -> None:
+
+        sheet = workbook.create_sheet(
+            "Interfaces"
+        )
+
+        headers = [
+            "ID",
+            "Label",
+            "Source",
+            "Target",
+            "Direction",
+            "Transfer Type",
+            "First Appears",
+            "Retired In",
+            "Visible On",
+        ]
+
+        sheet.append(
+            headers
+        )
+
+        ExcelExporter._format_header(
+            sheet
+        )
+
+        node_lookup = {
+            node.id: node
+            for node in model.nodes.values()
+        }
+
+        def sort_key(interface):
+
+            source = node_lookup.get(
+                interface.source
+            )
+
+            target = node_lookup.get(
+                interface.target
+            )
+
+            source_name = (
+                source.name.lower()
+                if source is not None
+                else interface.source.lower()
+            )
+
+            target_name = (
+                target.name.lower()
+                if target is not None
+                else interface.target.lower()
+            )
+
+            return (
+                source_name,
+                target_name,
+                interface.id.lower(),
+            )
+
+        for interface in sorted(
+            model.interfaces.values(),
+            key=sort_key,
+        ):
+
+            visible_on = (
+                ";".join(
+                    milestone
+                    for milestone
+                    in model.milestones
+                    if milestone
+                    in interface.visible_on
+                )
+            )
+
+            if (
+                interface.direction
+                == InterfaceDirection.TWO_WAY
+            ):
+                direction = "Two-way"
+            else:
+                direction = "One-way"
+
+            if (
+                interface.transfer_type
+                == TransferType.MANUAL
+            ):
+                transfer_type = "Manual"
+            else:
+                transfer_type = "Automatic"
+
+            sheet.append(
+                [
+                    interface.id,
+                    interface.label or "",
+                    interface.source,
+                    interface.target,
+                    direction,
+                    transfer_type,
+                    interface.first_appears,
+                    interface.retired_in,
+                    visible_on,
+                ]
+            )
+
+        ExcelExporter._auto_width(
+            sheet
+        )
+
+    # -----------------------------------------------------------------
+    # Children
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _write_children(
+        workbook: Workbook,
+        model: TransitionModel,
+    ) -> None:
+
+        sheet = workbook.create_sheet(
+            "Children"
+        )
+
+        headers = [
+            "Parent ID",
+            "ID",
+            "Name",
+            "Category",
+            "X",
+            "Y",
+            "Width",
+            "Height",
+            "Visible On",
+        ]
+
+        sheet.append(
+            headers
+        )
+
+        ExcelExporter._format_header(
+            sheet
+        )
+
+        nodes = sorted(
+            model.nodes.values(),
+            key=lambda n: (
+                n.name.lower(),
+                n.id.lower(),
+            ),
+        )
+
+        for parent in nodes:
+
+            children = sorted(
+                parent.children,
+                key=lambda child: (
+                    child.name.lower(),
+                    child.id.lower(),
+                ),
+            )
+
+            for child in children:
+
+                visible_on = (
+                    ";".join(
+                        milestone
+                        for milestone
+                        in model.milestones
+                        if milestone
+                        in child.visible_on
+                    )
+                )
+
+                sheet.append(
+                    [
+                        parent.id,
+                        child.id,
+                        child.name,
+                        child.category.value,
+                        child.x,
+                        child.y,
+                        child.width,
+                        child.height,
+                        visible_on,
+                    ]
+                )
+
+        ExcelExporter._auto_width(
+            sheet
+        )
+
+    # -----------------------------------------------------------------
+    # Formatting
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _format_header(
+        sheet,
+        row: int = 1,
+    ) -> None:
+
+        bold = Font(
+            bold=True
+        )
+
+        for cell in sheet[row]:
+            cell.font = bold
+
+        sheet.freeze_panes = (
+            f"A{row + 1}"
+        )
+
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _auto_width(
+        sheet,
+    ) -> None:
+
+        for column in sheet.columns:
+
+            length = max(
+                len(
+                    str(cell.value)
+                )
+                if cell.value is not None
+                else 0
+                for cell in column
+            )
+
+            #
+            # Keep very long validation
+            # messages from creating enormous
+            # columns.
+            #
+            width = min(
+                length + 2,
+                80,
+            )
+
+            sheet.column_dimensions[
+                column[0].column_letter
+            ].width = width
+
+    # -----------------------------------------------------------------
+    # Validation
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _write_validation_sheet(
@@ -348,19 +619,52 @@ class ExcelExporter:
         report: ValidationReport,
     ) -> None:
 
-        sheet = workbook.create_sheet("Validation")
+        sheet = workbook.create_sheet(
+            "Validation"
+        )
 
         #
         # Summary
         #
-        sheet.append(["Metric", "Count"])
-        sheet.append(["Errors", report.error_count])
-        sheet.append(["Warnings", report.warning_count])
+
+        sheet.append(
+            [
+                "Metric",
+                "Count",
+            ]
+        )
+
+        ExcelExporter._format_header(
+            sheet
+        )
+
+        sheet.append(
+            [
+                "Errors",
+                report.error_count,
+            ]
+        )
+
+        sheet.append(
+            [
+                "Warnings",
+                report.warning_count,
+            ]
+        )
+
+        sheet.append(
+            [
+                "Info",
+                report.info_count,
+            ]
+        )
+
         sheet.append([])
 
         #
         # Detail header
         #
+
         headers = [
             "Severity",
             "Rule",
@@ -370,25 +674,25 @@ class ExcelExporter:
             "Message",
         ]
 
-        sheet.append(headers)
+        detail_header_row = (
+            sheet.max_row + 1
+        )
 
-        #
-        # Make the header bold.
-        #
-        bold = Font(bold=True)
+        sheet.append(
+            headers
+        )
 
-        for cell in sheet[4]:
-            cell.font = bold
-
-        #
-        # Freeze the header.
-        #
-        sheet.freeze_panes = "A5"
+        ExcelExporter._format_header(
+            sheet,
+            row=detail_header_row,
+        )
 
         #
         # Sort findings:
-        # Errors first, then warnings,
-        # then by rule, object and page.
+        #
+        # Errors first,
+        # warnings second,
+        # info last.
         #
         severity_order = {
             ValidationSeverity.ERROR: 0,
@@ -398,11 +702,13 @@ class ExcelExporter:
 
         issues = sorted(
             report.issues,
-            key=lambda i: (
-                severity_order[i.severity],
-                i.rule,
-                i.object_id,
-                i.page,
+            key=lambda issue: (
+                severity_order[
+                    issue.severity
+                ],
+                issue.rule,
+                issue.object_id,
+                issue.page,
             ),
         )
 
@@ -419,4 +725,6 @@ class ExcelExporter:
                 ]
             )
 
-        ExcelExporter._auto_width(sheet)
+        ExcelExporter._auto_width(
+            sheet
+        )

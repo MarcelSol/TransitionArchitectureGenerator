@@ -12,6 +12,27 @@ horizontal_spacing: 80
 
 vertical_spacing: 80
 
+node_dimensions:
+  External:
+    width: 160
+    height: 80
+
+  Integration:
+    width: 180
+    height: 80
+
+  Transactional:
+    width: 200
+    height: 80
+
+  Master Data:
+    width: 180
+    height: 80
+
+  Unknown:
+    width: 160
+    height: 80
+
 connection_labels:
   node_classification:
     attribute: category

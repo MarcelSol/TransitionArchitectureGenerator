@@ -1,5 +1,6 @@
 import math
 
+from tag.config import load_config
 from tag.drawio import DrawioDocument
 from tag.validation_report import ValidationSeverity
 from tag.transition_model import (
@@ -16,9 +17,127 @@ from tag.color_classifier import ColorClassifier
 from tag.identifier_generator import IdentifierGenerator
 from tag.connection_label_generator import ConnectionLabelGenerator
 
+
 SNAP_DISTANCE = 10.0
 
+
 class TransitionModelBuilder:
+
+    def __init__(self) -> None:
+        settings = load_config()
+
+        self.node_dimensions = settings.get(
+            "node_dimensions",
+            {},
+        )
+
+        self._validate_node_dimensions()
+
+    # -----------------------------------------------------------------
+
+    def _node_dimensions(
+        self,
+        category,
+    ) -> tuple[float, float]:
+
+        category_name = (
+            category.value
+            if hasattr(category, "value")
+            else str(category)
+        )
+
+        configuration = self.node_dimensions.get(
+            category_name,
+        )
+
+        if configuration is None:
+            raise ValueError(
+                f"No node dimensions configured for "
+                f"category '{category_name}'"
+            )
+
+        width = float(
+            configuration["width"]
+        )
+
+        height = float(
+            configuration["height"]
+        )
+
+        return width, height
+
+    # -----------------------------------------------------------------
+
+    def _apply_node_dimensions(
+        self,
+        node: TransitionNode,
+    ) -> None:
+
+        width, height = self._node_dimensions(
+            node.category,
+        )
+
+        node.width = width
+        node.height = height
+
+    # -----------------------------------------------------------------
+
+    def _validate_node_dimensions(
+        self,
+    ) -> None:
+
+        if not self.node_dimensions:
+            raise ValueError(
+                "node_dimensions is missing or empty "
+                "in settings.yaml"
+            )
+
+        for category, configuration in (
+            self.node_dimensions.items()
+        ):
+
+            if not isinstance(
+                configuration,
+                dict,
+            ):
+                raise ValueError(
+                    f"node_dimensions.{category} "
+                    f"must be a mapping"
+                )
+
+            if "width" not in configuration:
+                raise ValueError(
+                    f"node_dimensions.{category}.width "
+                    f"is missing"
+                )
+
+            if "height" not in configuration:
+                raise ValueError(
+                    f"node_dimensions.{category}.height "
+                    f"is missing"
+                )
+
+            width = float(
+                configuration["width"]
+            )
+
+            height = float(
+                configuration["height"]
+            )
+
+            if width <= 0:
+                raise ValueError(
+                    f"node_dimensions.{category}.width "
+                    f"must be greater than zero"
+                )
+
+            if height <= 0:
+                raise ValueError(
+                    f"node_dimensions.{category}.height "
+                    f"must be greater than zero"
+                )
+
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _find_container(
@@ -26,8 +145,14 @@ class TransitionModelBuilder:
         page: DrawioPage,
     ) -> DrawioCell | None:
 
-        lookup = {c.id: c for c in page.cells}
-        parent = lookup.get(cell.parent)
+        lookup = {
+            c.id: c
+            for c in page.cells
+        }
+
+        parent = lookup.get(
+            cell.parent
+        )
 
         if (
             parent is not None
@@ -67,7 +192,10 @@ class TransitionModelBuilder:
             ) != 0:
                 continue
 
-            area = other.width * other.height
+            area = (
+                other.width
+                * other.height
+            )
 
             if area > largest_area:
                 largest = other
@@ -100,13 +228,16 @@ class TransitionModelBuilder:
             if not cell.is_interface_label:
                 continue
 
-            edge = lookup.get(cell.parent)
+            edge = lookup.get(
+                cell.parent
+            )
 
             if edge is None:
                 continue
 
             edge.interface_label = cell.value
 
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _is_interface_label(
@@ -119,6 +250,7 @@ class TransitionModelBuilder:
         )
 
     # -----------------------------------------------------------------
+
     @staticmethod
     def _contains(
         parent: TransitionNode,
@@ -179,7 +311,10 @@ class TransitionModelBuilder:
         dx = x - nearest_x
         dy = y - nearest_y
 
-        return math.hypot(dx, dy)
+        return math.hypot(
+            dx,
+            dy,
+        )
 
     # -----------------------------------------------------------------
 
@@ -195,6 +330,7 @@ class TransitionModelBuilder:
         nearest_distance = float("inf")
 
         for node in cells:
+
             if not node.vertex:
                 continue
 
@@ -217,7 +353,10 @@ class TransitionModelBuilder:
                 nearest_distance = distance
                 nearest_node = node
 
-        return nearest_node, nearest_distance
+        return (
+            nearest_node,
+            nearest_distance,
+        )
 
     # -----------------------------------------------------------------
 
@@ -233,14 +372,18 @@ class TransitionModelBuilder:
         #
         for node in model.nodes.values():
 
-            node.first_appears = TransitionModelBuilder._first_visible(
-                node.visible_on,
-                milestones,
+            node.first_appears = (
+                TransitionModelBuilder._first_visible(
+                    node.visible_on,
+                    milestones,
+                )
             )
 
-            node.retired_in = TransitionModelBuilder._retired_in(
-                node.visible_on,
-                milestones,
+            node.retired_in = (
+                TransitionModelBuilder._retired_in(
+                    node.visible_on,
+                    milestones,
+                )
             )
 
         #
@@ -248,17 +391,21 @@ class TransitionModelBuilder:
         #
         for interface in model.interfaces.values():
 
-            interface.first_appears = TransitionModelBuilder._first_visible(
-                interface.visible_on,
-                milestones,
+            interface.first_appears = (
+                TransitionModelBuilder._first_visible(
+                    interface.visible_on,
+                    milestones,
+                )
             )
 
-            interface.retired_in = TransitionModelBuilder._retired_in(
-                interface.visible_on,
-                milestones,
+            interface.retired_in = (
+                TransitionModelBuilder._retired_in(
+                    interface.visible_on,
+                    milestones,
+                )
             )
 
-    # ---------------------------------------------------------------------
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _first_visible(
@@ -273,7 +420,7 @@ class TransitionModelBuilder:
 
         return ""
 
-    # ---------------------------------------------------------------------
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _last_visible(
@@ -290,6 +437,7 @@ class TransitionModelBuilder:
 
         return last
 
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _retired_in(
@@ -309,6 +457,7 @@ class TransitionModelBuilder:
 
         return ""
 
+    # -----------------------------------------------------------------
 
     def build(
         self,
@@ -320,8 +469,9 @@ class TransitionModelBuilder:
         child_owner = {}
 
         for page in document.pages:
+
             #
-            # Add the interface lablel if it exist,
+            # Add the interface label if it exists.
             #
             TransitionModelBuilder._attach_interface_labels(
                 page
@@ -330,14 +480,16 @@ class TransitionModelBuilder:
             #
             # Preserve milestone order.
             #
-            model.milestones.append(page.name)
-
+            model.milestones.append(
+                page.name
+            )
 
             #
             # Nodes
             #
 
             for cell in page.cells:
+
                 if not cell.vertex:
                     continue
 
@@ -345,7 +497,9 @@ class TransitionModelBuilder:
                 # Ignore unnamed vertices.
                 #
 
-                name = LabelNormalizer.normalize(cell.value or "")
+                name = LabelNormalizer.normalize(
+                    cell.value or ""
+                )
 
                 if not name:
                     continue
@@ -353,12 +507,19 @@ class TransitionModelBuilder:
                 if cell.is_interface_label:
                     continue
 
-                container = TransitionModelBuilder._find_container(
-                    cell,
-                    page,
+                container = (
+                    TransitionModelBuilder._find_container(
+                        cell,
+                        page,
+                    )
                 )
 
-                node_id = IdentifierGenerator.node_id(name)
+                node_id = (
+                    IdentifierGenerator.node_id(
+                        name
+                    )
+                )
+
                 drawio_to_tag[cell.id] = node_id
 
                 #
@@ -367,60 +528,118 @@ class TransitionModelBuilder:
                 if node_id in child_owner:
                     continue
 
-                node = model.nodes.get(node_id)
+                node = model.nodes.get(
+                    node_id
+                )
 
                 if node is None:
 
                     if container is None:
 
+                        category = (
+                            ColorClassifier.classify(
+                                cell.style
+                            )
+                        )
+
                         node = TransitionNode(
                             id=node_id,
                             name=name,
-                            category=ColorClassifier.classify(cell.style),
+                            category=category,
+                        )
+
+                        #
+                        # Node dimensions are defined by
+                        # category in settings.yaml.
+                        #
+                        self._apply_node_dimensions(
+                            node
                         )
 
                         model.nodes[node_id] = node
 
                     else:
 
-                        container_id = IdentifierGenerator.node_id(
-                            LabelNormalizer.normalize(container.value)
+                        container_id = (
+                            IdentifierGenerator.node_id(
+                                LabelNormalizer.normalize(
+                                    container.value
+                                )
+                            )
                         )
 
-                        owner = model.nodes.get(container_id)
+                        owner = model.nodes.get(
+                            container_id
+                        )
 
                         if owner is None:
 
-                            owner = TransitionNode(
-                                id=container_id,
-                                name=LabelNormalizer.normalize(container.value),
-                                category=ColorClassifier.classify(container.style),
+                            owner_category = (
+                                ColorClassifier.classify(
+                                    container.style
+                                )
                             )
 
-                            model.nodes[container_id] = owner
-                            owner.visible_on.add(page.name)
+                            owner = TransitionNode(
+                                id=container_id,
+                                name=LabelNormalizer.normalize(
+                                    container.value
+                                ),
+                                category=owner_category,
+                            )
+
+                            #
+                            # Container dimensions are also
+                            # defined by category.
+                            #
+                            self._apply_node_dimensions(
+                                owner
+                            )
+
+                            model.nodes[
+                                container_id
+                            ] = owner
+
+                            owner.visible_on.add(
+                                page.name
+                            )
 
                         owner.children.append(
                             TransitionChild(
                                 id=node_id,
                                 name=name,
-                                category=ColorClassifier.classify(cell.style),
-                                x=cell.x - container.x,
-                                y=cell.y - container.y,
+                                category=(
+                                    ColorClassifier.classify(
+                                        cell.style
+                                    )
+                                ),
+                                x=(
+                                    cell.x
+                                    - container.x
+                                ),
+                                y=(
+                                    cell.y
+                                    - container.y
+                                ),
                                 width=cell.width,
                                 height=cell.height,
                             )
                         )
 
-                        child_owner[node_id] = container_id
+                        child_owner[node_id] = (
+                            container_id
+                        )
 
                         continue
 
-                node.visible_on.add(page.name)
+                node.visible_on.add(
+                    page.name
+                )
 
             #
             # Interfaces
             #
+
             for cell in page.cells:
 
                 if not cell.edge:
@@ -430,13 +649,33 @@ class TransitionModelBuilder:
                 # Ignore incomplete interfaces.
                 # But report the error.
                 #
-                source_id = drawio_to_tag.get(cell.source, "")
-                target_id = drawio_to_tag.get(cell.target, "")
-                source_id = child_owner.get(source_id, source_id)
-                target_id = child_owner.get(target_id, target_id)
+                source_id = drawio_to_tag.get(
+                    cell.source,
+                    "",
+                )
+
+                target_id = drawio_to_tag.get(
+                    cell.target,
+                    "",
+                )
+
+                source_id = child_owner.get(
+                    source_id,
+                    source_id,
+                )
+
+                target_id = child_owner.get(
+                    target_id,
+                    target_id,
+                )
+
                 incomplete = False
 
-                if not cell.source or cell.source not in drawio_to_tag:
+                if (
+                    not cell.source
+                    or cell.source
+                    not in drawio_to_tag
+                ):
 
                     source_node, distance = (
                         TransitionModelBuilder._find_nearest_node(
@@ -452,8 +691,18 @@ class TransitionModelBuilder:
                         and distance <= SNAP_DISTANCE
                     ):
 
-                        source_id = drawio_to_tag[source_node.id]
-                        source_id = child_owner.get(source_id, source_id)
+                        source_id = (
+                            drawio_to_tag[
+                                source_node.id
+                            ]
+                        )
+
+                        source_id = (
+                            child_owner.get(
+                                source_id,
+                                source_id,
+                            )
+                        )
 
                         model.report.add(
                             severity=ValidationSeverity.INFO,
@@ -478,12 +727,18 @@ class TransitionModelBuilder:
                             object_id=cell.id,
                             object_name="",
                             page=page.name,
-                            message="Connector has no source node.",
+                            message=(
+                                "Connector has no source node."
+                            ),
                         )
 
                         incomplete = True
 
-                if not cell.target or cell.target not in drawio_to_tag:
+                if (
+                    not cell.target
+                    or cell.target
+                    not in drawio_to_tag
+                ):
 
                     target_node, distance = (
                         TransitionModelBuilder._find_nearest_node(
@@ -499,9 +754,18 @@ class TransitionModelBuilder:
                         and distance <= SNAP_DISTANCE
                     ):
 
-                        target_id = drawio_to_tag[target_node.id]
-                        target_id = child_owner.get(target_id, target_id)
+                        target_id = (
+                            drawio_to_tag[
+                                target_node.id
+                            ]
+                        )
 
+                        target_id = (
+                            child_owner.get(
+                                target_id,
+                                target_id,
+                            )
+                        )
 
                         model.report.add(
                             severity=ValidationSeverity.INFO,
@@ -526,7 +790,9 @@ class TransitionModelBuilder:
                             object_id=cell.id,
                             object_name="",
                             page=page.name,
-                            message="Connector has no target node.",
+                            message=(
+                                "Connector has no target node."
+                            ),
                         )
 
                         incomplete = True
@@ -534,28 +800,48 @@ class TransitionModelBuilder:
                 if incomplete:
                     continue
 
-
                 #
                 # Direction
                 #
 
-                if cell.style.get("startArrow", "none") != "none":
-                    direction = InterfaceDirection.TWO_WAY
+                if (
+                    cell.style.get(
+                        "startArrow",
+                        "none",
+                    )
+                    != "none"
+                ):
+                    direction = (
+                        InterfaceDirection.TWO_WAY
+                    )
                 else:
-                    direction = InterfaceDirection.ONE_WAY
+                    direction = (
+                        InterfaceDirection.ONE_WAY
+                    )
 
                 #
                 # Transfer type
                 #
 
-                if cell.style.get("dashed", "0") == "1":
-                    transfer_type = TransferType.MANUAL
+                if (
+                    cell.style.get(
+                        "dashed",
+                        "0",
+                    )
+                    == "1"
+                ):
+                    transfer_type = (
+                        TransferType.MANUAL
+                    )
                 else:
-                    transfer_type = TransferType.AUTOMATED
+                    transfer_type = (
+                        TransferType.AUTOMATED
+                    )
 
                 #
                 # Build the key.
                 #
+
                 key = InterfaceKey(
                     source=source_id,
                     target=target_id,
@@ -567,14 +853,18 @@ class TransitionModelBuilder:
                 # Existing interface?
                 #
 
-                interface = model.interfaces.get(key)
+                interface = model.interfaces.get(
+                    key
+                )
 
                 if interface is None:
 
                     interface = TransitionInterface(
-                        id=IdentifierGenerator.interface_id(
-                            source_id,
-                            target_id,
+                        id=(
+                            IdentifierGenerator.interface_id(
+                                source_id,
+                                target_id,
+                            )
                         ),
                         source=source_id,
                         target=target_id,
@@ -583,12 +873,17 @@ class TransitionModelBuilder:
                         label=cell.interface_label,
                     )
 
-                    model.interfaces[key] = interface
+                    model.interfaces[key] = (
+                        interface
+                    )
 
-                interface.visible_on.add(page.name)
+                interface.visible_on.add(
+                    page.name
+                )
 
-
-        TransitionModelBuilder._compute_lifecycle(model)
+        TransitionModelBuilder._compute_lifecycle(
+            model
+        )
 
         ConnectionLabelGenerator().generate(
             model
