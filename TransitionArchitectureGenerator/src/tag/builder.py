@@ -14,6 +14,7 @@ from tag.transition_model import (
 from tag.label_normalizer import LabelNormalizer
 from tag.color_classifier import ColorClassifier
 from tag.identifier_generator import IdentifierGenerator
+from tag.connection_label_generator import ConnectionLabelGenerator
 
 SNAP_DISTANCE = 10.0
 
@@ -588,4 +589,9 @@ class TransitionModelBuilder:
 
 
         TransitionModelBuilder._compute_lifecycle(model)
+
+        ConnectionLabelGenerator().generate(
+            model
+        )
+
         return model

@@ -11,3 +11,21 @@ box_height: 60
 horizontal_spacing: 80
 
 vertical_spacing: 80
+
+connection_labels:
+  node_classification:
+    attribute: category
+
+    priority:
+      - value: External
+        code: SB
+      - value: Integration
+        code: TC
+      - value: Transactional
+        code: DWH
+      - value: Master Data
+        code: API
+
+  sequence:
+    width: 3
+    start: 1
