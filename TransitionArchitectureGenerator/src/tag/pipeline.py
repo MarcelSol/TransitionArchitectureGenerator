@@ -1,16 +1,41 @@
-from tag.builder import TransitionModelBuilder
+from pathlib import Path
+
 from tag.reader import DrawioReader
+from tag.builder import TransitionModelBuilder
+from tag.excel_reader import ExcelReader
 
 
 class Pipeline:
 
     @staticmethod
-    def load(filename: str):
+    def load(
+        filename: str,
+    ):
 
-        reader = DrawioReader(filename)
+        path = Path(filename)
 
-        document = reader.read()
+        suffix = path.suffix.lower()
 
-        builder = TransitionModelBuilder()
+        if suffix == ".drawio":
+            reader = DrawioReader(
+                filename
+            )
 
-        return builder.build(document)
+            document = reader.read()
+
+            builder = TransitionModelBuilder()
+
+            return builder.build(
+                document
+            )
+
+        if suffix == ".xlsx":
+            return ExcelReader.read(
+                filename
+            )
+
+        raise ValueError(
+            "Unsupported input file type "
+            f"'{path.suffix}'. "
+            "Expected .drawio or .xlsx."
+        )
