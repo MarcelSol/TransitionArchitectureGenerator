@@ -14,24 +14,24 @@ vertical_spacing: 80
 
 node_dimensions:
   External:
-    width: 160
-    height: 80
+    width: 120
+    height: 60
 
   Integration:
-    width: 180
-    height: 80
+    width: 140
+    height: 60
 
   Transactional:
-    width: 200
-    height: 80
+    width: 160
+    height: 60
 
   Master Data:
-    width: 180
-    height: 80
+    width: 140
+    height: 60
 
   Unknown:
-    width: 160
-    height: 80
+    width: 120
+    height: 60
 
 connection_labels:
   node_classification:

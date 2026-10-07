@@ -11,6 +11,7 @@ from tag.validation_report import ValidationSeverity
 from tag.layout.graph_builder import LayoutGraphBuilder
 from tag.layout.graph_peeler import GraphPeeler
 from tag.layout.placer import LayoutPlacer
+from tag.drawio_writer import DrawioWriter
 from pathlib import Path
 
 INPUT_FOLDER = "input"
@@ -206,6 +207,93 @@ def analyze(file: str):
             f"    x={position.x:.1f}"
             f"    y={position.y:.1f}"
         )
+
+@app.command()
+def generate(
+    file: str,
+    output: str | None = None,
+):
+    """
+    Generate an optimized Draw.io architecture from an input file.
+
+    The input may be either a .drawio or .xlsx file.
+    """
+
+    print(f"[green]TAG[/green] version {__version__}")
+    print()
+
+    input_path = Path(file)
+
+    if output is None:
+        output = str(
+            input_path.with_suffix(".optimized.drawio")
+        )
+
+    print(
+        f"Input file  : {input_path}"
+    )
+
+    print(
+        f"Output file : {output}"
+    )
+
+    print()
+
+    # -------------------------------------------------------------
+    # Load the transition model.
+    # -------------------------------------------------------------
+
+    transition = Pipeline.load(
+        str(input_path)
+    )
+
+    # -------------------------------------------------------------
+    # Build the semantic layout graph.
+    # -------------------------------------------------------------
+
+    graph = LayoutGraphBuilder.build(
+        transition
+    )
+
+    # -------------------------------------------------------------
+    # Calculate graph complexity.
+    # -------------------------------------------------------------
+
+    GraphPeeler.peel(
+        graph
+    )
+
+    # -------------------------------------------------------------
+    # Calculate node positions.
+    # -------------------------------------------------------------
+
+    placer = LayoutPlacer()
+
+    positions = placer.place(
+        graph
+    )
+
+    # -------------------------------------------------------------
+    # Generate the Draw.io document.
+    # -------------------------------------------------------------
+
+    DrawioWriter.write(
+        model=transition,
+        graph=graph,
+        positions=positions,
+        filename=output,
+    )
+
+    print(
+        f"Generated {len(transition.nodes)} nodes "
+        f"and {len(transition.interfaces)} interfaces."
+    )
+
+    print()
+
+    print(
+        f"[green]Draw.io file written to:[/green] {output}"
+    )
 
 @app.command()
 def version():
