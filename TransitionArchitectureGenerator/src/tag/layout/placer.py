@@ -76,12 +76,86 @@ class LayoutPlacer:
         self.grid_size = grid_size
         self.node_spacing = node_spacing
 
+    def _category_order(
+        self,
+        graph: LayoutGraph,
+    ) -> list[str]:
+        """
+        Return categories ordered from most connected to least
+        connected.
+
+        A graph edge is counted once for every category that it
+        connects to. An edge between two nodes of the same category
+        is counted only once for that category.
+        """
+
+        connectivity: dict[str, int] = {}
+
+        counted_edges: set[tuple[str, str]] = set()
+
+        for node in graph.nodes.values():
+
+            connectivity.setdefault(
+                node.category,
+                0,
+            )
+
+            for neighbour_id in node.neighbours:
+
+                edge = tuple(
+                    sorted(
+                        (
+                            node.id,
+                            neighbour_id,
+                        )
+                    )
+                )
+
+                if edge in counted_edges:
+                    continue
+
+                counted_edges.add(edge)
+
+                neighbour = graph.nodes[neighbour_id]
+
+                connectivity[node.category] += 1
+
+                if neighbour.category != node.category:
+
+                    connectivity.setdefault(
+                        neighbour.category,
+                        0,
+                    )
+
+                    connectivity[
+                        neighbour.category
+                    ] += 1
+
+        return sorted(
+            connectivity,
+            key=lambda category: (
+                -connectivity[category],
+                category.casefold(),
+            ),
+        )
+
     def place(
         self,
         graph: LayoutGraph,
     ) -> dict[str, NodePosition]:
         """
         Calculate a grid position for every node.
+
+        Nodes are placed category by category.
+
+        Categories with the highest architectural connectivity
+        are placed first and therefore form the innermost onion
+        layers. Less connected categories are progressively
+        pushed outward.
+
+        Within each category, the most connected nodes are placed
+        first so that they influence the position of the remaining
+        nodes in that category.
         """
 
         positions: dict[str, NodePosition] = {}
@@ -91,28 +165,24 @@ class LayoutPlacer:
         if not nodes:
             return positions
 
-        complexities = sorted(
-            {
-                node.complexity
-                for node in nodes
-                if node.complexity is not None
-            },
-            reverse=True,
+        category_order = self._category_order(
+            graph
         )
 
         minimum_layer = 1
 
-        for complexity in complexities:
+        for category in category_order:
 
-            complexity_nodes = [
+            category_nodes = [
                 node
                 for node in nodes
-                if node.complexity == complexity
+                if node.category == category
             ]
 
             ordered_nodes = sorted(
-                complexity_nodes,
+                category_nodes,
                 key=lambda node: (
+                    -len(node.neighbours),
                     node.peel_round
                     if node.peel_round is not None
                     else -1,
@@ -138,10 +208,11 @@ class LayoutPlacer:
 
                 positions[node.id] = position
 
-            if complexity_nodes:
+            if category_nodes:
+
                 minimum_layer = max(
                     positions[node.id].layout_layer
-                    for node in complexity_nodes
+                    for node in category_nodes
                 )
 
         return positions
@@ -392,15 +463,17 @@ class LayoutPlacer:
 
         x/y represent the top-left cell.
 
+        The footprint therefore extends to the right and downward.
+
         A node with width=3 and height=2 at (-2, 3)
         occupies:
 
             (-2, 3) (-1, 3) (0, 3)
-            (-2, 2) (-1, 2) (0, 2)
+            (-2, 4) (-1, 4) (0, 4)
         """
 
         return {
-            (x + dx, y - dy)
+            (x + dx, y + dy)
             for dx in range(node.width)
             for dy in range(node.height)
         }

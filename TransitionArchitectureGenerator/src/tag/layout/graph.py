@@ -13,6 +13,7 @@ class LayoutNode:
 
     id: str
     name: str
+    category: str = "Unknown"
 
     #
     # Union of all neighbours across every page.
