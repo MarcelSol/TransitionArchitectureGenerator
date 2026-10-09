@@ -12,6 +12,11 @@ horizontal_spacing: 80
 
 vertical_spacing: 80
 
+milestone_borders:
+  first_appearance: "#00E600"
+  last_appearance: "#FF0000"
+  default: "#000000"
+
 node_dimensions:
   External:
     width: 120

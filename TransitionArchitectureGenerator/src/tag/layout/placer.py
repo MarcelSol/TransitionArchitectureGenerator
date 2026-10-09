@@ -81,60 +81,31 @@ class LayoutPlacer:
         graph: LayoutGraph,
     ) -> list[str]:
         """
-        Return categories ordered from most connected to least
-        connected.
+        Return categories ordered from the highest individual node
+        connectivity to the lowest.
 
-        A graph edge is counted once for every category that it
-        connects to. An edge between two nodes of the same category
-        is counted only once for that category.
+        Isolated nodes are excluded from category ordering because
+        they are placed after every connected node, regardless of
+        their category.
         """
 
-        connectivity: dict[str, int] = {}
-
-        counted_edges: set[tuple[str, str]] = set()
+        maximum_connectivity: dict[str, int] = {}
 
         for node in graph.nodes.values():
+            degree = len(node.neighbours)
 
-            connectivity.setdefault(
-                node.category,
-                0,
+            if degree == 0:
+                continue
+
+            maximum_connectivity[node.category] = max(
+                maximum_connectivity.get(node.category, 0),
+                degree,
             )
 
-            for neighbour_id in node.neighbours:
-
-                edge = tuple(
-                    sorted(
-                        (
-                            node.id,
-                            neighbour_id,
-                        )
-                    )
-                )
-
-                if edge in counted_edges:
-                    continue
-
-                counted_edges.add(edge)
-
-                neighbour = graph.nodes[neighbour_id]
-
-                connectivity[node.category] += 1
-
-                if neighbour.category != node.category:
-
-                    connectivity.setdefault(
-                        neighbour.category,
-                        0,
-                    )
-
-                    connectivity[
-                        neighbour.category
-                    ] += 1
-
         return sorted(
-            connectivity,
+            maximum_connectivity,
             key=lambda category: (
-                -connectivity[category],
+                -maximum_connectivity[category],
                 category.casefold(),
             ),
         )
@@ -146,16 +117,12 @@ class LayoutPlacer:
         """
         Calculate a grid position for every node.
 
-        Nodes are placed category by category.
+        Categories are processed from the highest individual node
+        connectivity to the lowest. Within each category, connected
+        nodes are placed from most connected to least connected.
 
-        Categories with the highest architectural connectivity
-        are placed first and therefore form the innermost onion
-        layers. Less connected categories are progressively
-        pushed outward.
-
-        Within each category, the most connected nodes are placed
-        first so that they influence the position of the remaining
-        nodes in that category.
+        Nodes with no connections are always placed last,
+        regardless of category.
         """
 
         positions: dict[str, NodePosition] = {}
@@ -165,18 +132,18 @@ class LayoutPlacer:
         if not nodes:
             return positions
 
-        category_order = self._category_order(
-            graph
-        )
-
+        category_order = self._category_order(graph)
         minimum_layer = 1
 
+        # Place connected nodes category by category.
+        # Isolated nodes are deferred until every connected node
+        # has been placed, regardless of their category.
         for category in category_order:
-
             category_nodes = [
                 node
                 for node in nodes
                 if node.category == category
+                and node.neighbours
             ]
 
             ordered_nodes = sorted(
@@ -191,7 +158,6 @@ class LayoutPlacer:
             )
 
             for node in ordered_nodes:
-
                 position = self._find_best_position(
                     node=node,
                     minimum_layer=minimum_layer,
@@ -209,11 +175,57 @@ class LayoutPlacer:
                 positions[node.id] = position
 
             if category_nodes:
-
                 minimum_layer = max(
                     positions[node.id].layout_layer
                     for node in category_nodes
                 )
+
+        # Isolated nodes go last regardless of category.
+        # They start at the outermost layer reached by the
+        # connected nodes.
+        isolated_nodes = sorted(
+            (
+                node
+                for node in nodes
+                if not node.neighbours
+            ),
+            key=lambda node: (
+                node.category.casefold(),
+                node.name.casefold(),
+            ),
+        )
+
+        minimum_layer = max(
+            minimum_layer,
+            max(
+                (
+                    position.layout_layer
+                    for position in positions.values()
+                ),
+                default=1,
+            ),
+        )
+
+        for node in isolated_nodes:
+            position = self._find_best_position(
+                node=node,
+                minimum_layer=minimum_layer,
+                positions=positions,
+                graph=graph,
+            )
+
+            if position is None:
+                raise RuntimeError(
+                    f"Could not place isolated node '{node.name}' "
+                    f"with minimum layout layer {minimum_layer}"
+                )
+
+            positions[node.id] = position
+
+            minimum_layer = max(
+                minimum_layer,
+                position.layout_layer,
+            )
 
         return positions
 
@@ -242,7 +254,6 @@ class LayoutPlacer:
         ]
 
         if placed_neighbours:
-
             preferred_x = round(
                 sum(
                     position.x
@@ -276,7 +287,6 @@ class LayoutPlacer:
         )
 
         while search_radius <= 1000:
-
             candidates = self._generate_grid_candidates(
                 preferred_x,
                 preferred_y,
@@ -294,7 +304,6 @@ class LayoutPlacer:
             )
 
             for x, y in candidates:
-
                 layer = self._node_layer(
                     node=node,
                     x=x,
@@ -338,22 +347,17 @@ class LayoutPlacer:
         candidates: list[tuple[int, int]] = []
 
         for distance in range(radius + 1):
-
             for dx in range(-distance, distance + 1):
-
                 dy = distance - abs(dx)
 
                 if dy == 0:
-
                     candidates.append(
                         (
                             preferred_x + dx,
                             preferred_y,
                         )
                     )
-
                 else:
-
                     candidates.append(
                         (
                             preferred_x + dx,
@@ -402,15 +406,12 @@ class LayoutPlacer:
             layer_penalty = 0
 
         if neighbours:
-
             distance = sum(
                 abs(x - neighbour.x)
                 + abs(y - neighbour.y)
                 for neighbour in neighbours
             )
-
         else:
-
             distance = abs(x) + abs(y)
 
         return (
@@ -440,7 +441,6 @@ class LayoutPlacer:
         )
 
         for other_id, position in positions.items():
-
             other_node = graph.nodes[other_id]
 
             other_occupied = self._occupied_cells(
@@ -520,7 +520,6 @@ class LayoutPlacer:
         """
 
         for layer in range(1, 1001):
-
             width = self._layer_width(layer)
             height = self._layer_height(layer)
 

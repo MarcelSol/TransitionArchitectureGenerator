@@ -8,6 +8,7 @@ from tag.drawio import (
 )
 from tag.layout.graph import LayoutGraph
 from tag.layout.placer import NodePosition
+from tag.config import load_config
 from tag.transition_model import (
     InterfaceDirection,
     TransferType,
@@ -18,8 +19,8 @@ from tag.transition_model import (
 
 class DrawioWriter:
 
-    PAGE_ID = "TAG_PAGE_1"
-    PAGE_NAME = "Optimized Architecture"
+    PAGE_ID = "TAG_COMPLETE_ARCHITECTURE"
+    PAGE_NAME = "Complete Architecture"
 
     ROOT_ID = "0"
     LAYER_ID = "1"
@@ -45,10 +46,13 @@ class DrawioWriter:
             positions,
         )
 
+        config = load_config()
+
         document = DrawioWriter._build_document(
             model,
             graph,
             positions,
+            config,
         )
 
         DrawioWriter._write_xml(
@@ -101,15 +105,63 @@ class DrawioWriter:
         model: TransitionModel,
         graph: LayoutGraph,
         positions: dict[str, NodePosition],
+        config: dict | None = None,
     ) -> DrawioDocument:
 
-        page = DrawioPage(
-            id=DrawioWriter.PAGE_ID,
-            name=DrawioWriter.PAGE_NAME,
+        if config is None:
+            config = load_config()
+
+        document = DrawioDocument()
+
+        # The complete architecture is deliberately independent of the
+        # milestone lifecycle rules and is always the first page.
+        document.pages.append(
+            DrawioWriter._build_page(
+                model=model,
+                graph=graph,
+                positions=positions,
+                page_id=DrawioWriter.PAGE_ID,
+                page_name=DrawioWriter.PAGE_NAME,
+                config=config,
+                milestone=None,
+                milestone_index=None,
+            )
         )
 
-        document = DrawioDocument(
-            pages=[page],
+        # Add one page per milestone, preserving the input order.
+        for index, milestone in enumerate(model.milestones):
+            document.pages.append(
+                DrawioWriter._build_page(
+                    model=model,
+                    graph=graph,
+                    positions=positions,
+                    page_id=f"TAG_MILESTONE_{index + 1:03d}",
+                    page_name=milestone,
+                    config=config,
+                    milestone=milestone,
+                    milestone_index=index,
+                )
+            )
+
+        return document
+
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _build_page(
+        model: TransitionModel,
+        graph: LayoutGraph,
+        positions: dict[str, NodePosition],
+        page_id: str,
+        page_name: str,
+        config: dict,
+        milestone: str | None,
+        milestone_index: int | None,
+    ) -> DrawioPage:
+
+        page = DrawioPage(
+            id=page_id,
+            name=page_name,
         )
 
         page.cells.append(
@@ -125,71 +177,108 @@ class DrawioWriter:
             )
         )
 
+        is_complete_page = milestone is None
+        default_border = DrawioWriter._default_border(config)
+        visible_node_ids = set()
+
+        for node in model.nodes.values():
+            if is_complete_page:
+                visible_node_ids.add(node.id)
+                continue
+
+            if milestone in node.visible_on:
+                visible_node_ids.add(node.id)
+                continue
+
+            # A composite container must remain visible whenever one or
+            # more of its children are visible on this milestone.
+            if node.children and any(
+                milestone in child.visible_on
+                for child in node.children
+            ):
+                visible_node_ids.add(node.id)
+
         # -------------------------------------------------------------
-        # Nodes
+        # Nodes and composite children
         # -------------------------------------------------------------
 
         for node in sorted(
             model.nodes.values(),
             key=lambda item: item.name.lower(),
         ):
+            if node.id not in visible_node_ids:
+                continue
 
             position = positions[node.id]
+            node_border = default_border
+
+            if not is_complete_page:
+                node_border = DrawioWriter._lifecycle_border(
+                    visible_on=node.visible_on,
+                    milestones=model.milestones,
+                    milestone_index=milestone_index,
+                    config=config,
+                )
 
             parent_cell = DrawioWriter._build_node_cell(
                 node,
                 position,
+                border_color=node_border,
             )
-
-            page.cells.append(
-                parent_cell
-            )
-
-            # ---------------------------------------------------------
-            # Children
-            # ---------------------------------------------------------
+            page.cells.append(parent_cell)
 
             if node.children:
-
                 child_offset_x, child_offset_y = (
                     DrawioWriter._child_offsets(node)
                 )
 
-                for index, child in enumerate(
-                    node.children
-                ):
+                # Keep the original child index in the cell ID on every
+                # page. Hidden children therefore do not renumber the rest.
+                for index, child in enumerate(node.children):
+                    if (
+                        not is_complete_page
+                        and milestone not in child.visible_on
+                    ):
+                        continue
 
-                    child_cell = (
-                        DrawioWriter._build_child_cell(
-                            node,
-                            child,
-                            index,
-                            child_offset_x,
-                            child_offset_y,
-                        )
-                    )
+                    # Lifecycle highlighting for a composite belongs to
+                    # its parent container, not to individual children.
+                    child_border = default_border
 
-                    page.cells.append(
-                        child_cell
+                    child_cell = DrawioWriter._build_child_cell(
+                        node,
+                        child,
+                        index,
+                        child_offset_x,
+                        child_offset_y,
+                        border_color=child_border,
                     )
+                    page.cells.append(child_cell)
 
         # -------------------------------------------------------------
         # Interfaces
-        #
-        # Deliberately no interface-label cells are created here.
         # -------------------------------------------------------------
 
         for index, interface in enumerate(
             model.interfaces.values(),
             start=1,
         ):
+            if not is_complete_page:
+                if milestone not in interface.visible_on:
+                    continue
+
+                # Do not emit connectors whose endpoints are hidden on
+                # this milestone page.
+                if (
+                    interface.source not in visible_node_ids
+                    or interface.target not in visible_node_ids
+                ):
+                    continue
 
             edge_id = (
-                f"interface_"
-                f"{index:03d}_"
+                f"interface_{index:03d}_"
                 f"{interface.id}"
             )
-
             page.cells.append(
                 DrawioWriter._build_interface_cell(
                     interface,
@@ -197,7 +286,51 @@ class DrawioWriter:
                 )
             )
 
-        return document
+        return page
+
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _default_border(config: dict) -> str:
+        milestone_borders = config.get("milestone_borders", {})
+        return milestone_borders.get("default", "#000000")
+
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _lifecycle_border(
+        visible_on: set[str],
+        milestones: list[str],
+        milestone_index: int | None,
+        config: dict,
+    ) -> str:
+
+        default_border = DrawioWriter._default_border(config)
+        if milestone_index is None or not milestones:
+            return default_border
+
+        if milestone_index < 0 or milestone_index >= len(milestones):
+            return default_border
+
+        current_milestone = milestones[milestone_index]
+        if current_milestone not in visible_on:
+            return default_border
+
+        borders = config.get("milestone_borders", {})
+
+        # The first milestone cannot have first-appearance highlights.
+        if milestone_index > 0:
+            previous_milestone = milestones[milestone_index - 1]
+            if previous_milestone not in visible_on:
+                return borders.get("first_appearance", "#00E600")
+
+        # The last milestone cannot have disappearance highlights.
+        if milestone_index < len(milestones) - 1:
+            next_milestone = milestones[milestone_index + 1]
+            if next_milestone not in visible_on:
+                return borders.get("last_appearance", "#FF0000")
+
+        return default_border
 
     # -----------------------------------------------------------------
 
@@ -205,6 +338,7 @@ class DrawioWriter:
     def _build_node_cell(
         node: TransitionNode,
         position: NodePosition,
+        border_color: str = "#000000",
     ) -> DrawioCell:
 
         x, y = DrawioWriter._physical_position(
@@ -235,7 +369,8 @@ class DrawioWriter:
 
             style = (
                 DrawioWriter._container_style(
-                    node
+                    node,
+                    border_color,
                 )
             )
 
@@ -245,6 +380,7 @@ class DrawioWriter:
                 DrawioWriter._node_style(
                     node.category.value,
                     node.fill_color,
+                    border_color,
                 )
             )
 
@@ -269,6 +405,7 @@ class DrawioWriter:
         index: int,
         offset_x: float,
         offset_y: float,
+        border_color: str = "#000000",
     ) -> DrawioCell:
 
         child_id = (
@@ -285,6 +422,7 @@ class DrawioWriter:
             style=DrawioWriter._child_style(
                 child.category.value,
                 child.fill_color,
+                border_color,
             ),
             vertex=True,
             parent=parent.id,
@@ -410,14 +548,18 @@ class DrawioWriter:
     def _node_style(
         category: str,
         fill_color: str,
+        border_color: str = "#000000",
     ) -> dict[str, str]:
+
+        stroke_width = "4" if border_color.upper() in {"#00E600", "#FF0000"} else "1"
 
         return {
             "rounded": "0",
             "whiteSpace": "wrap",
             "html": "1",
             "fillColor": fill_color,
-            "strokeColor": "#000000",
+            "strokeColor": border_color,
+            "strokeWidth": stroke_width,
             "fontColor": "#000000",
             "align": "center",
             "verticalAlign": "middle",
@@ -429,7 +571,10 @@ class DrawioWriter:
     @staticmethod
     def _container_style(
         node: TransitionNode,
+        border_color: str = "#000000",
     ) -> dict[str, str]:
+
+        stroke_width = "4" if border_color.upper() in {"#00E600", "#FF0000"} else "1"
 
         return {
             "shape": "swimlane",
@@ -447,7 +592,8 @@ class DrawioWriter:
             "rounded": "0",
             "fillColor": "#FFFFFF",
             "swimlaneFillColor": "#FFFFFF",
-            "strokeColor": "#000000",
+            "strokeColor": border_color,
+            "strokeWidth": stroke_width,
             "fontColor": "#000000",
             "fontSize": "12",
             "fontStyle": "1",
@@ -462,14 +608,18 @@ class DrawioWriter:
     def _child_style(
         category: str,
         fill_color: str,
+        border_color: str = "#000000",
     ) -> dict[str, str]:
+
+        stroke_width = "4" if border_color.upper() in {"#00E600", "#FF0000"} else "1"
 
         return {
             "rounded": "0",
             "whiteSpace": "wrap",
             "html": "1",
             "fillColor": fill_color,
-            "strokeColor": "#666666",
+            "strokeColor": border_color,
+            "strokeWidth": stroke_width,
             "fontColor": "#000000",
             "align": "center",
             "verticalAlign": "middle",

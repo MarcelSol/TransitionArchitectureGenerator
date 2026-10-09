@@ -526,6 +526,14 @@ class TransitionModelBuilder:
                 # Already known?
                 #
                 if node_id in child_owner:
+                    owner = model.nodes[child_owner[node_id]]
+                    owner.visible_on.add(page.name)
+
+                    for child in owner.children:
+                        if child.id == node_id:
+                            child.visible_on.add(page.name)
+                            break
+
                     continue
 
                 node = model.nodes.get(
@@ -626,8 +634,11 @@ class TransitionModelBuilder:
                                 width=cell.width,
                                 height=cell.height,
                                 fill_color=cell.style.get("fillColor", "#FFFFFF"),
+                                visible_on={page.name},
                             )
                         )
+
+                        owner.visible_on.add(page.name)
 
                         child_owner[node_id] = (
                             container_id
