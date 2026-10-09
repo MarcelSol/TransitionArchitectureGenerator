@@ -43,9 +43,14 @@ class LayoutGraphBuilder:
                 node.name,
             )
 
-            graph.nodes[node.id].category = (
-                node.category.value
-            )
+            if node.children:
+                graph.nodes[node.id].category = (
+                    node.children[0].category.value
+                )
+            else:
+                graph.nodes[node.id].category = (
+                    node.category.value
+                )
 
             graph.nodes[node.id].width = width
             graph.nodes[node.id].height = height

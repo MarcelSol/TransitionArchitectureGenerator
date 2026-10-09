@@ -546,6 +546,7 @@ class TransitionModelBuilder:
                             id=node_id,
                             name=name,
                             category=category,
+                            fill_color=cell.style.get("fillColor", "#FFFFFF"),
                         )
 
                         #
@@ -586,6 +587,7 @@ class TransitionModelBuilder:
                                     container.value
                                 ),
                                 category=owner_category,
+                                fill_color=cell.style.get("fillColor", "#FFFFFF"),
                             )
 
                             #
@@ -623,6 +625,7 @@ class TransitionModelBuilder:
                                 ),
                                 width=cell.width,
                                 height=cell.height,
+                                fill_color=cell.style.get("fillColor", "#FFFFFF"),
                             )
                         )
 

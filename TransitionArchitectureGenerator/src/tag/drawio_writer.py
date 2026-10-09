@@ -243,7 +243,8 @@ class DrawioWriter:
 
             style = (
                 DrawioWriter._node_style(
-                    node.category.value
+                    node.category.value,
+                    node.fill_color,
                 )
             )
 
@@ -282,7 +283,8 @@ class DrawioWriter:
             id=child_id,
             value=child.name,
             style=DrawioWriter._child_style(
-                child.category.value
+                child.category.value,
+                child.fill_color,
             ),
             vertex=True,
             parent=parent.id,
@@ -407,20 +409,8 @@ class DrawioWriter:
     @staticmethod
     def _node_style(
         category: str,
+        fill_color: str,
     ) -> dict[str, str]:
-
-        colors = {
-            "External": "#D9EAD3",
-            "Integration": "#F4CCCC",
-            "Transactional": "#FFD966",
-            "Master Data": "#D9D2E9",
-            "Unknown": "#FFFFFF",
-        }
-
-        fill_color = colors.get(
-            category,
-            "#FFFFFF",
-        )
 
         return {
             "rounded": "0",
@@ -471,20 +461,8 @@ class DrawioWriter:
     @staticmethod
     def _child_style(
         category: str,
+        fill_color: str,
     ) -> dict[str, str]:
-
-        colors = {
-            "External": "#D9EAD3",
-            "Integration": "#F4CCCC",
-            "Transactional": "#FFD966",
-            "Master Data": "#D9D2E9",
-            "Unknown": "#FFFFFF",
-        }
-
-        fill_color = colors.get(
-            category,
-            "#FFFFFF",
-        )
 
         return {
             "rounded": "0",

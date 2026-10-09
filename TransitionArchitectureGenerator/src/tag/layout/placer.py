@@ -377,17 +377,29 @@ class LayoutPlacer:
         node: LayoutNode,
         neighbours: list[NodePosition],
         minimum_layer: int,
-    ) -> tuple[float, int, int, int]:
+    ) -> tuple[int, int, int, int, int]:
         """
         Score a candidate position.
 
-        Connected nodes are preferred to be close together.
+        The onion layer has priority over connection distance.
 
-        Among otherwise similar candidates, the innermost permitted
-        layer is preferred.
+        This means that the current onion layer is filled before
+        placement expands into the next layer.
 
-        The remaining terms provide deterministic tie-breaking.
+        Within the same layer, connected nodes are preferred to
+        remain close together.
         """
+
+        layer = self._node_layer(
+            node=node,
+            x=x,
+            y=y,
+        )
+
+        if layer < minimum_layer:
+            layer_penalty = 1_000_000
+        else:
+            layer_penalty = 0
 
         if neighbours:
 
@@ -401,20 +413,10 @@ class LayoutPlacer:
 
             distance = abs(x) + abs(y)
 
-        layer = self._node_layer(
-            node=node,
-            x=x,
-            y=y,
-        )
-
-        if layer < minimum_layer:
-            layer_penalty = 1_000_000
-        else:
-            layer_penalty = 0
-
         return (
-            layer_penalty + distance,
+            layer_penalty,
             layer,
+            distance,
             abs(y),
             abs(x),
         )

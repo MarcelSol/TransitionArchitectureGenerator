@@ -46,6 +46,8 @@ class TransitionChild:
 
     height: float
 
+    fill_color: str = "#FFFFFF"
+
     visible_on: set[str] = field(default_factory=set)
 
 @dataclass(slots=True)
@@ -56,6 +58,8 @@ class TransitionNode:
     name: str
 
     category: NodeCategory = NodeCategory.UNKNOWN
+
+    fill_color: str = "#FFFFFF"
 
     width: float = 0.0
     height: float = 0.0
